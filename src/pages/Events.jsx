@@ -9,6 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
 import api, { getApiError, getStoredUser } from "../services/api";
+import { resolveImageUrl } from "../utils/assets";
 import { formatDate, statusTone, titleize } from "../utils/formatters";
 
 export default function Events() {
@@ -238,12 +239,12 @@ export default function Events() {
                     )}
                   </div>
 
-                  <div className="bg-slate-100">
-                    {selectedEvent.image_url ? (
+                  <div className="flex max-h-[min(68vh,720px)] items-center justify-center overflow-hidden bg-slate-100">
+                    {resolveImageUrl(selectedEvent.image_url) ? (
                       <img
-                        src={selectedEvent.image_url}
+                        src={resolveImageUrl(selectedEvent.image_url)}
                         alt={selectedEvent.title}
-                        className="max-h-[520px] w-full object-cover"
+                        className="max-h-[min(68vh,720px)] w-full object-contain"
                       />
                     ) : (
                       <div className="flex aspect-[16/9] items-center justify-center bg-gradient-to-br from-slate-900 via-primary to-cyan-700 p-8 text-center text-white">

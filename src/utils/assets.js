@@ -1,3 +1,5 @@
+import { ROOT_BASE_URL } from "../services/api";
+
 function encodeS3Key(key) {
   return key
     .split("/")
@@ -42,8 +44,8 @@ export function resolveImageUrl(value) {
   }
 
   if (raw.startsWith("/")) {
-    return raw;
+    return `${ROOT_BASE_URL}${raw}`;
   }
 
-  return "";
+  return `${ROOT_BASE_URL}/${raw.replace(/^\.?\//, "")}`;
 }

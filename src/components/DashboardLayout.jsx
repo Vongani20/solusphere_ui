@@ -28,7 +28,7 @@ const navigation = [
   { name: "SIA Chat", href: "/chatbot", icon: ChatBubbleLeftRightIcon },
   { name: "BPO Analysis", href: "/bpo", icon: DocumentChartBarIcon },
   { name: "Uploads", href: "/uploads", icon: CloudArrowUpIcon },
-  { name: "Admin", href: "/admin", icon: ShieldCheckIcon },
+  { name: "Admin", href: "/admin", icon: ShieldCheckIcon, adminOnly: true },
 ];
 
 export default function DashboardLayout({ children }) {
@@ -36,6 +36,10 @@ export default function DashboardLayout({ children }) {
   const [user, setUser] = useState(() => getStoredUser());
   const location = useLocation();
   const navigate = useNavigate();
+  const visibleNavigation = useMemo(
+    () => navigation.filter((item) => !item.adminOnly || user?.role === "admin"),
+    [user?.role]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -56,12 +60,12 @@ export default function DashboardLayout({ children }) {
 
   const currentPage = useMemo(() => {
     return (
-      navigation.find((item) => {
+      visibleNavigation.find((item) => {
         if (item.href === "/dashboard") return location.pathname === item.href;
         return location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
       })?.name || "SoluSphere"
     );
-  }, [location.pathname]);
+  }, [location.pathname, visibleNavigation]);
 
   const handleLogout = () => {
     clearSession();
@@ -103,7 +107,7 @@ export default function DashboardLayout({ children }) {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const Icon = item.icon;
             const isActive =
               location.pathname === item.href ||

@@ -14,6 +14,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import HelpDesk from "./pages/helpdesk";
 import Chatbot from "./pages/Chatbot";
 import UpdatePassword from "./pages/UpdatePassword";
+import AdminRoute from "./components/AdminRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -103,7 +104,9 @@ function App() {
           path="/admin"
           element={
             <ProtectedRoute>
-              <Admin />
+              <AdminRoute>
+                <Admin />
+              </AdminRoute>
             </ProtectedRoute>
           }
         />

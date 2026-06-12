@@ -11,6 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
 import api, { getApiError, saveSession } from "../services/api";
+import { resolveImageUrl } from "../utils/assets";
 import { formatDate, statusTone, titleize } from "../utils/formatters";
 
 export default function Admin() {
@@ -19,7 +20,8 @@ export default function Admin() {
   const [users, setUsers] = useState([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [imageURL, setImageURL] = useState("");
+  const [eventImageFile, setEventImageFile] = useState(null);
+  const [eventImagePreview, setEventImagePreview] = useState("");
   const [targetUserID, setTargetUserID] = useState("");
   const [targetRole, setTargetRole] = useState("admin");
   const [newUsername, setNewUsername] = useState("");
@@ -67,6 +69,19 @@ export default function Admin() {
     loadAdminContext();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (eventImagePreview) URL.revokeObjectURL(eventImagePreview);
+    };
+  }, [eventImagePreview]);
+
+  const handleEventImage = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (eventImagePreview) URL.revokeObjectURL(eventImagePreview);
+    setEventImageFile(file);
+    setEventImagePreview(file ? URL.createObjectURL(file) : "");
+  };
+
   const bootstrapAdmin = async () => {
     setBootstrapping(true);
     setMessage("");
@@ -83,23 +98,38 @@ export default function Admin() {
     }
   };
 
-  const createEvent = async (event) => {
-    event.preventDefault();
+  const createEvent = async (submitEvent) => {
+    submitEvent.preventDefault();
+    const form = submitEvent.currentTarget;
     setCreating(true);
     setMessage("");
     setError("");
 
     try {
+      let uploadedImageURL = "";
+
+      if (eventImageFile) {
+        const formData = new FormData();
+        formData.append("file", eventImageFile);
+        const uploadRes = await api.post("/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        uploadedImageURL = uploadRes.data.file_url || "";
+      }
+
       const res = await api.post("/admin/events", {
         title: title.trim(),
         description: description.trim(),
-        image_url: imageURL.trim(),
+        image_url: uploadedImageURL,
       });
       setMessage("Event created.");
       setEvents((items) => [res.data.event, ...items]);
       setTitle("");
       setDescription("");
-      setImageURL("");
+      setEventImageFile(null);
+      if (eventImagePreview) URL.revokeObjectURL(eventImagePreview);
+      setEventImagePreview("");
+      form.reset();
     } catch (err) {
       setError(getApiError(err, "Failed to create event."));
     } finally {
@@ -351,17 +381,14 @@ export default function Admin() {
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">Image URL</span>
-                <span className="relative block">
-                  <PhotoIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="url"
-                    value={imageURL}
-                    onChange={(event) => setImageURL(event.target.value)}
-                    className="input pl-10"
-                    placeholder="https://..."
-                  />
-                </span>
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Event Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleEventImage}
+                  className="block w-full rounded-lg border border-slate-300 bg-white text-sm text-slate-700 file:mr-4 file:border-0 file:bg-slate-900 file:px-4 file:py-3 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
+                  required
+                />
               </label>
               <label className="block sm:col-span-2">
                 <span className="mb-2 block text-sm font-semibold text-slate-700">Description</span>
@@ -371,19 +398,19 @@ export default function Admin() {
                   className="input min-h-32 resize-y"
                 />
               </label>
-              {imageURL && (
-                <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 sm:col-span-2">
-                  <img src={imageURL} alt="Event preview" className="max-h-64 w-full object-cover" />
+              {eventImagePreview && (
+                <div className="flex max-h-80 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 sm:col-span-2">
+                  <img src={eventImagePreview} alt="Event preview" className="max-h-80 w-full object-contain" />
                 </div>
               )}
               <div className="flex items-end sm:col-span-2">
                 <button
                   type="submit"
-                  disabled={!title.trim() || creating}
+                  disabled={!title.trim() || !eventImageFile || creating}
                   className="btn btn-primary inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <PlusIcon className="h-5 w-5" />
-                  {creating ? "Creating..." : "Create Event"}
+                  {creating ? "Uploading..." : "Create Event"}
                 </button>
               </div>
             </div>
@@ -451,8 +478,10 @@ export default function Admin() {
                             <p className="truncate text-xs text-slate-500">{event.description || "No description"}</p>
                           </td>
                           <td className="px-4 py-3">
-                            {event.image_url ? (
-                              <img src={event.image_url} alt="" className="h-12 w-16 rounded-lg object-cover" />
+                            {resolveImageUrl(event.image_url) ? (
+                              <span className="flex h-12 w-16 items-center justify-center rounded-lg bg-slate-100">
+                                <img src={resolveImageUrl(event.image_url)} alt="" className="max-h-12 max-w-16 rounded-lg object-contain" />
+                              </span>
                             ) : (
                               <span className="flex h-12 w-16 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
                                 <PhotoIcon className="h-5 w-5" />
