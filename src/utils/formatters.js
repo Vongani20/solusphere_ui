@@ -41,17 +41,25 @@ export function titleize(value) {
 export function statusTone(status) {
   switch (String(status || "").toLowerCase()) {
     case "completed":
+    case "resolved":
     case "active":
     case "healthy":
     case "configured":
+    case "admin":
       return "bg-emerald-50 text-emerald-700 ring-emerald-200";
     case "processing":
     case "pending":
+    case "open":
+    case "in_progress":
+    case "in progress":
       return "bg-amber-50 text-amber-700 ring-amber-200";
     case "failed":
     case "unhealthy":
     case "not_configured":
+    case "closed":
       return "bg-rose-50 text-rose-700 ring-rose-200";
+    case "user":
+      return "bg-cyan-50 text-cyan-700 ring-cyan-200";
     default:
       return "bg-slate-100 text-slate-700 ring-slate-200";
   }

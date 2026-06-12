@@ -1,68 +1,129 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowPathIcon,
   CalendarDaysIcon,
   EnvelopeIcon,
-  PlusIcon,
-  PhotoIcon,
+  PencilSquareIcon,
   PhoneIcon,
+  PhotoIcon,
+  PlusIcon,
   ShieldCheckIcon,
+  TicketIcon,
+  TrashIcon,
   UserIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
 import api, { getApiError, saveSession } from "../services/api";
 import { resolveImageUrl } from "../utils/assets";
 import { formatDate, statusTone, titleize } from "../utils/formatters";
 
+const emptyUserForm = {
+  username: "",
+  email: "",
+  phone_number: "",
+  password: "",
+  role: "user",
+};
+
+const emptyEventForm = {
+  title: "",
+  description: "",
+  image_url: "",
+  status: "active",
+};
+
+const emptyTicketForm = {
+  subject: "",
+  description: "",
+  status: "open",
+};
+
+const tabs = [
+  { id: "users", label: "Users", icon: UserIcon },
+  { id: "events", label: "Events", icon: CalendarDaysIcon },
+  { id: "helpdesk", label: "Helpdesk", icon: TicketIcon },
+];
+
 export default function Admin() {
   const [profile, setProfile] = useState(null);
-  const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [eventImageFile, setEventImageFile] = useState(null);
-  const [eventImagePreview, setEventImagePreview] = useState("");
-  const [targetUserID, setTargetUserID] = useState("");
-  const [targetRole, setTargetRole] = useState("admin");
-  const [newUsername, setNewUsername] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newPhoneNumber, setNewPhoneNumber] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newUserRole, setNewUserRole] = useState("user");
+  const [events, setEvents] = useState([]);
+  const [tickets, setTickets] = useState([]);
+  const [activeTab, setActiveTab] = useState("users");
   const [loading, setLoading] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [creatingUser, setCreatingUser] = useState(false);
-  const [updatingRole, setUpdatingRole] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const [userForm, setUserForm] = useState(emptyUserForm);
+  const [editingUserID, setEditingUserID] = useState(null);
+  const [savingUser, setSavingUser] = useState(false);
+  const [deletingUserID, setDeletingUserID] = useState(null);
+
+  const [eventForm, setEventForm] = useState(emptyEventForm);
+  const [editingEventID, setEditingEventID] = useState(null);
+  const [eventImageFile, setEventImageFile] = useState(null);
+  const [eventImagePreview, setEventImagePreview] = useState("");
+  const [eventFileInputKey, setEventFileInputKey] = useState(0);
+  const [savingEvent, setSavingEvent] = useState(false);
+  const [deletingEventID, setDeletingEventID] = useState(null);
+
+  const [ticketForm, setTicketForm] = useState(emptyTicketForm);
+  const [editingTicketID, setEditingTicketID] = useState(null);
+  const [savingTicket, setSavingTicket] = useState(false);
+  const [deletingTicketID, setDeletingTicketID] = useState(null);
+
+  const selectedUser = useMemo(
+    () => users.find((user) => user.id === editingUserID),
+    [editingUserID, users]
+  );
+  const selectedEvent = useMemo(
+    () => events.find((event) => event.id === editingEventID),
+    [editingEventID, events]
+  );
+  const selectedTicket = useMemo(
+    () => tickets.find((ticket) => ticket.id === editingTicketID),
+    [editingTicketID, tickets]
+  );
+  const usersByID = useMemo(() => {
+    return users.reduce((map, user) => {
+      map.set(String(user.id), user);
+      return map;
+    }, new Map());
+  }, [users]);
 
   const loadAdminContext = async () => {
     setLoading(true);
     setError("");
 
-    try {
-      const [profileRes, eventsRes, usersRes] = await Promise.allSettled([
-        api.get("/profile"),
-        api.get("/events"),
-        api.get("/users"),
-      ]);
+    const [profileRes, usersRes, eventsRes, ticketsRes] = await Promise.allSettled([
+      api.get("/profile"),
+      api.get("/admin/users"),
+      api.get("/events"),
+      api.get("/admin/helpdesk"),
+    ]);
 
-      if (profileRes.status === "fulfilled") {
-        setProfile(profileRes.value.data.user);
-        saveSession({ user: profileRes.value.data.user });
-      }
-      if (eventsRes.status === "fulfilled") {
-        setEvents(eventsRes.value.data.events || []);
-      }
-      if (usersRes.status === "fulfilled") {
-        setUsers(usersRes.value.data.users || []);
-      }
-    } catch (err) {
-      setError(getApiError(err, "Failed to load admin data."));
-    } finally {
-      setLoading(false);
+    if (profileRes.status === "fulfilled") {
+      setProfile(profileRes.value.data.user);
+      saveSession({ user: profileRes.value.data.user });
     }
+    if (usersRes.status === "fulfilled") {
+      setUsers(usersRes.value.data.users || []);
+    }
+    if (eventsRes.status === "fulfilled") {
+      setEvents(eventsRes.value.data.events || []);
+    }
+    if (ticketsRes.status === "fulfilled") {
+      setTickets(ticketsRes.value.data.tickets || []);
+    }
+
+    const failed = [profileRes, usersRes, eventsRes, ticketsRes].find((result) => result.status === "rejected");
+    if (failed) {
+      setError(getApiError(failed.reason, "Failed to load admin data."));
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -71,125 +132,283 @@ export default function Admin() {
 
   useEffect(() => {
     return () => {
-      if (eventImagePreview) URL.revokeObjectURL(eventImagePreview);
+      if (eventImagePreview && eventImagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(eventImagePreview);
+      }
     };
   }, [eventImagePreview]);
 
+  const showSuccess = (text) => {
+    setMessage(text);
+    setError("");
+  };
+
+  const showError = (err, fallback) => {
+    setError(getApiError(err, fallback));
+    setMessage("");
+  };
+
+  const resetUserForm = () => {
+    setUserForm(emptyUserForm);
+    setEditingUserID(null);
+  };
+
+  const editUser = (user) => {
+    setActiveTab("users");
+    setEditingUserID(user.id);
+    setUserForm({
+      username: user.username || "",
+      email: user.email || "",
+      phone_number: user.phone_number || "",
+      password: "",
+      role: user.role || "user",
+    });
+  };
+
+  const submitUser = async (event) => {
+    event.preventDefault();
+    setSavingUser(true);
+    setError("");
+    setMessage("");
+
+    const payload = {
+      username: userForm.username.trim(),
+      email: userForm.email.trim(),
+      phone_number: userForm.phone_number.trim(),
+      role: userForm.role,
+    };
+    if (!editingUserID || userForm.password.trim()) {
+      payload.password = userForm.password;
+    }
+
+    try {
+      const res = editingUserID
+        ? await api.patch(`/admin/users/${editingUserID}`, payload)
+        : await api.post("/admin/users", payload);
+      const savedUser = res.data.user;
+      if (savedUser) {
+        setUsers((items) =>
+          editingUserID
+            ? items.map((item) => (item.id === savedUser.id ? savedUser : item))
+            : [savedUser, ...items.filter((item) => item.id !== savedUser.id)]
+        );
+      }
+      showSuccess(editingUserID ? "User updated." : "User created.");
+      resetUserForm();
+    } catch (err) {
+      showError(err, editingUserID ? "Failed to update user." : "Failed to create user.");
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  const deleteUser = async (user) => {
+    if (!window.confirm(`Delete ${user.username}?`)) return;
+    setDeletingUserID(user.id);
+    setError("");
+    setMessage("");
+
+    try {
+      await api.delete(`/admin/users/${user.id}`);
+      setUsers((items) => items.filter((item) => item.id !== user.id));
+      if (editingUserID === user.id) resetUserForm();
+      showSuccess("User deleted.");
+    } catch (err) {
+      showError(err, "Failed to delete user.");
+    } finally {
+      setDeletingUserID(null);
+    }
+  };
+
+  const resetEventForm = () => {
+    setEventForm(emptyEventForm);
+    setEditingEventID(null);
+    setEventImageFile(null);
+    if (eventImagePreview && eventImagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(eventImagePreview);
+    }
+    setEventImagePreview("");
+    setEventFileInputKey((value) => value + 1);
+  };
+
+  const editEvent = (item) => {
+    setActiveTab("events");
+    setEditingEventID(item.id);
+    setEventForm({
+      title: item.title || "",
+      description: item.description || "",
+      image_url: item.image_url || "",
+      status: item.status || "active",
+    });
+    setEventImageFile(null);
+    if (eventImagePreview && eventImagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(eventImagePreview);
+    }
+    setEventImagePreview(resolveImageUrl(item.image_url));
+    setEventFileInputKey((value) => value + 1);
+  };
+
   const handleEventImage = (event) => {
     const file = event.target.files?.[0] || null;
-    if (eventImagePreview) URL.revokeObjectURL(eventImagePreview);
+    if (eventImagePreview && eventImagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(eventImagePreview);
+    }
     setEventImageFile(file);
-    setEventImagePreview(file ? URL.createObjectURL(file) : "");
+    setEventImagePreview(file ? URL.createObjectURL(file) : resolveImageUrl(eventForm.image_url));
+  };
+
+  const uploadEventImage = async () => {
+    if (!eventImageFile) return eventForm.image_url;
+
+    const formData = new FormData();
+    formData.append("file", eventImageFile);
+    const uploadRes = await api.post("/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return uploadRes.data.file_url || "";
+  };
+
+  const submitEvent = async (event) => {
+    event.preventDefault();
+    setSavingEvent(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const imageURL = await uploadEventImage();
+      const payload = {
+        title: eventForm.title.trim(),
+        description: eventForm.description.trim(),
+        image_url: imageURL,
+        status: eventForm.status,
+      };
+      const res = editingEventID
+        ? await api.patch(`/admin/events/${editingEventID}`, payload)
+        : await api.post("/admin/events", payload);
+      const savedEvent = res.data.event;
+      if (savedEvent) {
+        setEvents((items) =>
+          editingEventID
+            ? items.map((item) => (item.id === savedEvent.id ? savedEvent : item))
+            : [savedEvent, ...items.filter((item) => item.id !== savedEvent.id)]
+        );
+      }
+      showSuccess(editingEventID ? "Event updated." : "Event created.");
+      resetEventForm();
+    } catch (err) {
+      showError(err, editingEventID ? "Failed to update event." : "Failed to create event.");
+    } finally {
+      setSavingEvent(false);
+    }
+  };
+
+  const deleteEvent = async (item) => {
+    if (!window.confirm(`Delete event "${item.title}"?`)) return;
+    setDeletingEventID(item.id);
+    setError("");
+    setMessage("");
+
+    try {
+      await api.delete(`/admin/events/${item.id}`);
+      setEvents((items) => items.filter((event) => event.id !== item.id));
+      if (editingEventID === item.id) resetEventForm();
+      showSuccess("Event deleted.");
+    } catch (err) {
+      showError(err, "Failed to delete event.");
+    } finally {
+      setDeletingEventID(null);
+    }
+  };
+
+  const resetTicketForm = () => {
+    setTicketForm(emptyTicketForm);
+    setEditingTicketID(null);
+  };
+
+  const editTicket = (ticket) => {
+    setActiveTab("helpdesk");
+    setEditingTicketID(ticket.id);
+    setTicketForm({
+      subject: ticket.subject || "",
+      description: ticket.description || "",
+      status: ticket.status || "open",
+    });
+  };
+
+  const submitTicket = async (event) => {
+    event.preventDefault();
+    setSavingTicket(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const payload = {
+        subject: ticketForm.subject.trim(),
+        description: ticketForm.description.trim(),
+        status: ticketForm.status,
+      };
+      const res = editingTicketID
+        ? await api.patch(`/admin/helpdesk/${editingTicketID}`, payload)
+        : await api.post("/helpdesk", {
+            subject: payload.subject,
+            description: payload.description,
+          });
+      const savedTicket = res.data.ticket;
+      if (savedTicket) {
+        setTickets((items) =>
+          editingTicketID
+            ? items.map((item) => (item.id === savedTicket.id ? savedTicket : item))
+            : [savedTicket, ...items.filter((item) => item.id !== savedTicket.id)]
+        );
+      }
+      showSuccess(editingTicketID ? "Helpdesk ticket updated." : "Helpdesk ticket created.");
+      resetTicketForm();
+    } catch (err) {
+      showError(err, editingTicketID ? "Failed to update helpdesk ticket." : "Failed to create helpdesk ticket.");
+    } finally {
+      setSavingTicket(false);
+    }
+  };
+
+  const deleteTicket = async (ticket) => {
+    if (!window.confirm(`Delete ticket #${ticket.id}?`)) return;
+    setDeletingTicketID(ticket.id);
+    setError("");
+    setMessage("");
+
+    try {
+      await api.delete(`/admin/helpdesk/${ticket.id}`);
+      setTickets((items) => items.filter((item) => item.id !== ticket.id));
+      if (editingTicketID === ticket.id) resetTicketForm();
+      showSuccess("Helpdesk ticket deleted.");
+    } catch (err) {
+      showError(err, "Failed to delete helpdesk ticket.");
+    } finally {
+      setDeletingTicketID(null);
+    }
+  };
+
+  const getTicketOwnerName = (ticket) => {
+    const directName = ticket.username || ticket.user_name || ticket.email || ticket.user_email;
+    if (directName) return directName;
+
+    const owner = usersByID.get(String(ticket.user_id));
+    return owner?.username || owner?.email || "Unknown user";
   };
 
   const bootstrapAdmin = async () => {
     setBootstrapping(true);
-    setMessage("");
     setError("");
+    setMessage("");
 
     try {
       const res = await api.post("/admin/bootstrap");
-      setMessage(res.data.message || "Admin bootstrap complete.");
+      showSuccess(res.data.message || "Admin bootstrap complete.");
       await loadAdminContext();
     } catch (err) {
-      setError(getApiError(err, "Admin bootstrap failed."));
+      showError(err, "Admin bootstrap failed.");
     } finally {
       setBootstrapping(false);
-    }
-  };
-
-  const createEvent = async (submitEvent) => {
-    submitEvent.preventDefault();
-    const form = submitEvent.currentTarget;
-    setCreating(true);
-    setMessage("");
-    setError("");
-
-    try {
-      let uploadedImageURL = "";
-
-      if (eventImageFile) {
-        const formData = new FormData();
-        formData.append("file", eventImageFile);
-        const uploadRes = await api.post("/upload", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        uploadedImageURL = uploadRes.data.file_url || "";
-      }
-
-      const res = await api.post("/admin/events", {
-        title: title.trim(),
-        description: description.trim(),
-        image_url: uploadedImageURL,
-      });
-      setMessage("Event created.");
-      setEvents((items) => [res.data.event, ...items]);
-      setTitle("");
-      setDescription("");
-      setEventImageFile(null);
-      if (eventImagePreview) URL.revokeObjectURL(eventImagePreview);
-      setEventImagePreview("");
-      form.reset();
-    } catch (err) {
-      setError(getApiError(err, "Failed to create event."));
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const createUser = async (event) => {
-    event.preventDefault();
-    setCreatingUser(true);
-    setMessage("");
-    setError("");
-
-    try {
-      const res = await api.post("/admin/users", {
-        username: newUsername.trim(),
-        email: newEmail.trim(),
-        phone_number: newPhoneNumber.trim(),
-        password: newPassword,
-        role: newUserRole,
-      });
-      const createdUser = res.data.user;
-      setMessage(`${createdUser?.username || "User"} created successfully.`);
-      if (createdUser) {
-        setUsers((items) => [createdUser, ...items.filter((item) => item.id !== createdUser.id)]);
-      }
-      setNewUsername("");
-      setNewEmail("");
-      setNewPhoneNumber("");
-      setNewPassword("");
-      setNewUserRole("user");
-    } catch (err) {
-      setError(getApiError(err, "Failed to create user."));
-    } finally {
-      setCreatingUser(false);
-    }
-  };
-
-  const updateRole = async (event) => {
-    event.preventDefault();
-    setUpdatingRole(true);
-    setMessage("");
-    setError("");
-
-    try {
-      const res = await api.patch(`/admin/users/${targetUserID}/role`, { role: targetRole });
-      const updatedUser = res.data.user;
-      setMessage(
-        updatedUser
-          ? `${updatedUser.username} is now ${titleize(updatedUser.role)}.`
-          : res.data.message || "User role updated."
-      );
-      if (updatedUser) {
-        setUsers((items) => items.map((item) => (item.id === updatedUser.id ? { ...item, ...updatedUser } : item)));
-      }
-      setTargetUserID("");
-    } catch (err) {
-      setError(getApiError(err, "Failed to update user role."));
-    } finally {
-      setUpdatingRole(false);
     }
   };
 
@@ -205,26 +424,32 @@ export default function Admin() {
               <div>
                 <h1 className="text-xl font-bold text-slate-950">Admin Console</h1>
                 <p className="text-sm text-slate-500">
-                  {profile ? `${profile.username} - ${profile.role}` : "Loading role"}
+                  {profile ? `${profile.username} - ${titleize(profile.role)}` : "Loading role"}
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={loadAdminContext}
-              className="btn btn-secondary inline-flex items-center gap-2"
-            >
-              <ArrowPathIcon className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={bootstrapAdmin}
+                disabled={bootstrapping}
+                className="btn btn-secondary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ShieldCheckIcon className="h-5 w-5" />
+                {bootstrapping ? "Bootstrapping..." : "Bootstrap"}
+              </button>
+              <button type="button" onClick={loadAdminContext} className="btn btn-secondary inline-flex items-center gap-2">
+                <ArrowPathIcon className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+            </div>
           </div>
 
-          {profile?.role !== "admin" && (
-            <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              <p className="font-bold">Admin access is not active for this account.</p>
-              <p className="mt-1">Bootstrap is available only while no admin user exists.</p>
-            </div>
-          )}
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <SummaryTile label="Users" value={users.length} />
+            <SummaryTile label="Events" value={events.length} />
+            <SummaryTile label="Tickets" value={tickets.length} />
+          </div>
         </section>
 
         {(message || error) && (
@@ -239,272 +464,311 @@ export default function Admin() {
           </div>
         )}
 
-        <section className="grid gap-6 lg:grid-cols-3">
-          <div className="card">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-600 text-white">
-                <ShieldCheckIcon className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">Bootstrap</h2>
-                <p className="text-sm text-slate-500">First admin setup</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={bootstrapAdmin}
-              disabled={bootstrapping}
-              className="btn btn-primary inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <ShieldCheckIcon className="h-5 w-5" />
-              {bootstrapping ? "Bootstrapping..." : "Bootstrap Admin"}
-            </button>
-          </div>
+        <div className="flex gap-2 overflow-x-auto rounded-lg border border-slate-200 bg-white p-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition ${
+                  active ? "bg-primary text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
 
-          <form onSubmit={createUser} className="card lg:col-span-2">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
-                <UserIcon className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">Create User</h2>
-                <p className="text-sm text-slate-500">Add an account and assign the starting role</p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <AdminInput label="Username" value={newUsername} onChange={setNewUsername} icon={UserIcon} required />
-              <AdminInput label="Email" type="email" value={newEmail} onChange={setNewEmail} icon={EnvelopeIcon} required />
-              <AdminInput label="Phone Number" type="tel" value={newPhoneNumber} onChange={setNewPhoneNumber} icon={PhoneIcon} />
-              <AdminInput
-                label="Temporary Password"
-                type="password"
-                value={newPassword}
-                onChange={setNewPassword}
-                icon={ShieldCheckIcon}
-                minLength={6}
-                required
+        {activeTab === "users" && (
+          <section className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
+            <form onSubmit={submitUser} className="card h-fit">
+              <FormHeader
+                icon={UserIcon}
+                title={editingUserID ? "Edit User" : "Create User"}
+                detail={selectedUser ? selectedUser.email : "Manage account access and roles"}
+                onCancel={editingUserID ? resetUserForm : undefined}
               />
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">Role</span>
-                <select value={newUserRole} onChange={(event) => setNewUserRole(event.target.value)} className="input bg-white">
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </label>
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  disabled={!newUsername.trim() || !newEmail.trim() || newPassword.length < 6 || creatingUser}
-                  className="btn btn-primary inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <PlusIcon className="h-5 w-5" />
-                  {creatingUser ? "Creating..." : "Create User"}
-                </button>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <AdminInput label="Username" value={userForm.username} onChange={(value) => setUserFormField(setUserForm, "username", value)} icon={UserIcon} required />
+                <AdminInput label="Email" type="email" value={userForm.email} onChange={(value) => setUserFormField(setUserForm, "email", value)} icon={EnvelopeIcon} required />
+                <AdminInput label="Phone" type="tel" value={userForm.phone_number} onChange={(value) => setUserFormField(setUserForm, "phone_number", value)} icon={PhoneIcon} />
+                <AdminInput
+                  label={editingUserID ? "New Password" : "Temporary Password"}
+                  type="password"
+                  value={userForm.password}
+                  onChange={(value) => setUserFormField(setUserForm, "password", value)}
+                  icon={ShieldCheckIcon}
+                  minLength={userForm.password ? 6 : undefined}
+                  required={!editingUserID}
+                />
+                <label className="block sm:col-span-2">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Role</span>
+                  <select value={userForm.role} onChange={(event) => setUserFormField(setUserForm, "role", event.target.value)} className="input bg-white">
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </label>
               </div>
-            </div>
-          </form>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-          <form onSubmit={updateRole} className="card">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
-                <UserIcon className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">User Role</h2>
-                <p className="text-sm text-slate-500">Select a user by name or email</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">User</span>
-                <select
-                  value={targetUserID}
-                  onChange={(event) => setTargetUserID(event.target.value)}
-                  className="input bg-white"
-                  required
-                >
-                  <option value="">Select user</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.username} - {user.email} ({titleize(user.role)})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">Role</span>
-                <select
-                  value={targetRole}
-                  onChange={(event) => setTargetRole(event.target.value)}
-                  className="input bg-white"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="user">User</option>
-                </select>
-              </label>
               <button
                 type="submit"
-                disabled={!targetUserID || updatingRole}
-                className="btn btn-primary inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  savingUser ||
+                  !userForm.username.trim() ||
+                  !userForm.email.trim() ||
+                  (!editingUserID && userForm.password.length < 6) ||
+                  (editingUserID && userForm.password && userForm.password.length < 6)
+                }
+                className="btn btn-primary mt-5 inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <UserIcon className="h-5 w-5" />
-                {updatingRole ? "Updating..." : "Update Role"}
+                <PlusIcon className="h-5 w-5" />
+                {savingUser ? "Saving..." : editingUserID ? "Update User" : "Create User"}
               </button>
-            </div>
-          </form>
+            </form>
 
-          <form onSubmit={createEvent} className="card">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-600 text-white">
-                <CalendarDaysIcon className="h-5 w-5" />
+            <DataCard title="Users" detail={`${users.length} records`}>
+              <div className="space-y-3">
+                {users.length === 0 ? (
+                  <EmptyState text={loading ? "Loading users..." : "No users loaded"} />
+                ) : (
+                  users.map((user) => (
+                    <RecordRow
+                      key={user.id}
+                      title={user.username}
+                      detail={user.email}
+                      meta={titleize(user.role)}
+                      statusKey={user.role}
+                      subDetail={user.phone_number || user.auth_provider || "No phone"}
+                      placeholderIcon={UserIcon}
+                      onEdit={() => editUser(user)}
+                      onDelete={() => deleteUser(user)}
+                      deleting={deletingUserID === user.id}
+                      deleteDisabled={profile?.id === user.id}
+                    />
+                  ))
+                )}
               </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">Create Event</h2>
-                <p className="text-sm text-slate-500">Event image and comment workspace</p>
-              </div>
-            </div>
+            </DataCard>
+          </section>
+        )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">Title</span>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  className="input"
-                  maxLength={255}
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">Event Image</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleEventImage}
-                  className="block w-full rounded-lg border border-slate-300 bg-white text-sm text-slate-700 file:mr-4 file:border-0 file:bg-slate-900 file:px-4 file:py-3 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
-                  required
-                />
-              </label>
-              <label className="block sm:col-span-2">
-                <span className="mb-2 block text-sm font-semibold text-slate-700">Description</span>
-                <textarea
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  className="input min-h-32 resize-y"
-                />
-              </label>
-              {eventImagePreview && (
-                <div className="flex max-h-80 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 sm:col-span-2">
-                  <img src={eventImagePreview} alt="Event preview" className="max-h-80 w-full object-contain" />
-                </div>
-              )}
-              <div className="flex items-end sm:col-span-2">
-                <button
-                  type="submit"
-                  disabled={!title.trim() || !eventImageFile || creating}
-                  className="btn btn-primary inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <PlusIcon className="h-5 w-5" />
-                  {creating ? "Uploading..." : "Create Event"}
-                </button>
-              </div>
-            </div>
-          </form>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-          <div className="card">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">Users</h2>
-                <p className="text-sm text-slate-500">{users.length} users visible</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {users.length === 0 ? (
-                <EmptyState text="No users loaded" />
-              ) : (
-                users.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-slate-950">{user.username}</p>
-                      <p className="truncate text-xs text-slate-500">{user.email}</p>
-                    </div>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200">
-                      {titleize(user.role)}
-                    </span>
+        {activeTab === "events" && (
+          <section className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
+            <form onSubmit={submitEvent} className="card h-fit">
+              <FormHeader
+                icon={CalendarDaysIcon}
+                title={editingEventID ? "Edit Event" : "Create Event"}
+                detail={selectedEvent ? selectedEvent.title : "Manage event media and comment spaces"}
+                onCancel={editingEventID ? resetEventForm : undefined}
+              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Title</span>
+                  <input
+                    type="text"
+                    value={eventForm.title}
+                    onChange={(event) => setEventFormField("title", event.target.value)}
+                    className="input"
+                    maxLength={255}
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Status</span>
+                  <select value={eventForm.status} onChange={(event) => setEventFormField("status", event.target.value)} className="input bg-white">
+                    <option value="active">Active</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Description</span>
+                  <textarea
+                    value={eventForm.description}
+                    onChange={(event) => setEventFormField("description", event.target.value)}
+                    className="input min-h-28 resize-y"
+                  />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Event Image</span>
+                  <input
+                    key={eventFileInputKey}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEventImage}
+                    className="block w-full rounded-lg border border-slate-300 bg-white text-sm text-slate-700 file:mr-4 file:border-0 file:bg-slate-900 file:px-4 file:py-3 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
+                    required={!editingEventID}
+                  />
+                </label>
+                {eventImagePreview && (
+                  <div className="flex max-h-80 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 sm:col-span-2">
+                    <img src={eventImagePreview} alt="Event preview" className="max-h-80 w-full object-contain" />
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">Events</h2>
-                <p className="text-sm text-slate-500">{events.length} records visible</p>
+                )}
               </div>
-            </div>
+              <button
+                type="submit"
+                disabled={savingEvent || !eventForm.title.trim() || (!editingEventID && !eventImageFile)}
+                className="btn btn-primary mt-5 inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <PlusIcon className="h-5 w-5" />
+                {savingEvent ? "Saving..." : editingEventID ? "Update Event" : "Create Event"}
+              </button>
+            </form>
 
-            <div className="overflow-hidden rounded-lg border border-slate-200">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Image</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
-                    {events.length === 0 ? (
-                      <tr>
-                        <td colSpan="4" className="px-4 py-10 text-center text-sm font-medium text-slate-500">
-                          No events loaded
-                        </td>
-                      </tr>
-                    ) : (
-                      events.map((event) => (
-                        <tr key={event.id} className="hover:bg-slate-50">
-                          <td className="max-w-[320px] px-4 py-3">
-                            <p className="truncate text-sm font-semibold text-slate-950">{event.title}</p>
-                            <p className="truncate text-xs text-slate-500">{event.description || "No description"}</p>
-                          </td>
-                          <td className="px-4 py-3">
-                            {resolveImageUrl(event.image_url) ? (
-                              <span className="flex h-12 w-16 items-center justify-center rounded-lg bg-slate-100">
-                                <img src={resolveImageUrl(event.image_url)} alt="" className="max-h-12 max-w-16 rounded-lg object-contain" />
-                              </span>
-                            ) : (
-                              <span className="flex h-12 w-16 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
-                                <PhotoIcon className="h-5 w-5" />
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${statusTone(event.status)}`}>
-                              {event.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-500">{formatDate(event.created_at)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+            <DataCard title="Events" detail={`${events.length} records`}>
+              <div className="space-y-3">
+                {events.length === 0 ? (
+                  <EmptyState text={loading ? "Loading events..." : "No events loaded"} />
+                ) : (
+                  events.map((event) => (
+                    <RecordRow
+                      key={event.id}
+                      title={event.title}
+                      detail={event.description || "No description"}
+                      meta={titleize(event.status)}
+                      statusKey={event.status}
+                      subDetail={formatDate(event.created_at)}
+                      image={resolveImageUrl(event.image_url)}
+                      placeholderIcon={PhotoIcon}
+                      onEdit={() => editEvent(event)}
+                      onDelete={() => deleteEvent(event)}
+                      deleting={deletingEventID === event.id}
+                    />
+                  ))
+                )}
               </div>
-            </div>
-          </div>
-        </section>
+            </DataCard>
+          </section>
+        )}
+
+        {activeTab === "helpdesk" && (
+          <section className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
+            <form onSubmit={submitTicket} className="card h-fit">
+              <FormHeader
+                icon={TicketIcon}
+                title={editingTicketID ? "Edit Ticket" : "Create Ticket"}
+                detail={selectedTicket ? `Ticket #${selectedTicket.id}` : "Manage support tickets"}
+                onCancel={editingTicketID ? resetTicketForm : undefined}
+              />
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Subject</span>
+                  <input
+                    type="text"
+                    value={ticketForm.subject}
+                    onChange={(event) => setTicketFormField("subject", event.target.value)}
+                    className="input"
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Description</span>
+                  <textarea
+                    value={ticketForm.description}
+                    onChange={(event) => setTicketFormField("description", event.target.value)}
+                    className="input min-h-36 resize-y"
+                    required
+                  />
+                </label>
+                {editingTicketID && (
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Status</span>
+                    <select value={ticketForm.status} onChange={(event) => setTicketFormField("status", event.target.value)} className="input bg-white">
+                      <option value="open">Open</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </label>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={savingTicket || !ticketForm.subject.trim() || !ticketForm.description.trim()}
+                className="btn btn-primary mt-5 inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <PlusIcon className="h-5 w-5" />
+                {savingTicket ? "Saving..." : editingTicketID ? "Update Ticket" : "Create Ticket"}
+              </button>
+            </form>
+
+            <DataCard title="Helpdesk Tickets" detail={`${tickets.length} records`}>
+              <div className="space-y-3">
+                {tickets.length === 0 ? (
+                  <EmptyState text={loading ? "Loading tickets..." : "No tickets loaded"} />
+                ) : (
+                  tickets.map((ticket) => (
+                    <RecordRow
+                      key={ticket.id}
+                      title={`#${ticket.id} ${ticket.subject}`}
+                      detail={ticket.description}
+                      meta={titleize(ticket.status)}
+                      statusKey={ticket.status}
+                      subDetail={`${getTicketOwnerName(ticket)} - ${formatDate(ticket.created_at)}`}
+                      placeholderIcon={TicketIcon}
+                      onEdit={() => editTicket(ticket)}
+                      onDelete={() => deleteTicket(ticket)}
+                      deleting={deletingTicketID === ticket.id}
+                    />
+                  ))
+                )}
+              </div>
+            </DataCard>
+          </section>
+        )}
       </div>
     </DashboardLayout>
+  );
+
+  function setEventFormField(field, value) {
+    setEventForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function setTicketFormField(field, value) {
+    setTicketForm((current) => ({ ...current, [field]: value }));
+  }
+}
+
+function setUserFormField(setter, field, value) {
+  setter((current) => ({ ...current, [field]: value }));
+}
+
+function SummaryTile({ label, value }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-extrabold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function FormHeader({ icon: Icon, title, detail, onCancel }) {
+  return (
+    <div className="mb-5 flex items-start justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-slate-950">{title}</h2>
+          <p className="text-sm text-slate-500">{detail}</p>
+        </div>
+      </div>
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+          aria-label="Cancel edit"
+        >
+          <XMarkIcon className="h-5 w-5" />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -527,18 +791,76 @@ function AdminInput({ label, type = "text", value, onChange, icon: Icon, require
   );
 }
 
+function DataCard({ title, detail, children }) {
+  return (
+    <div className="card">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-950">{title}</h2>
+          <p className="text-sm text-slate-500">{detail}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function RecordRow({
+  title,
+  detail,
+  meta,
+  statusKey,
+  subDetail,
+  image,
+  placeholderIcon: PlaceholderIcon = PhotoIcon,
+  onEdit,
+  onDelete,
+  deleting,
+  deleteDisabled = false,
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-3">
+        {image ? (
+          <span className="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+            <img src={image} alt="" className="max-h-14 max-w-20 rounded-lg object-contain" />
+          </span>
+        ) : (
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+            <PlaceholderIcon className="h-5 w-5" />
+          </span>
+        )}
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-sm font-bold text-slate-950">{title}</p>
+            {meta && <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${statusTone(statusKey || meta)}`}>{meta}</span>}
+          </div>
+          <p className="mt-1 line-clamp-2 text-sm text-slate-500">{detail || "No detail"}</p>
+          {subDetail && <p className="mt-1 text-xs font-medium text-slate-400">{subDetail}</p>}
+        </div>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <button type="button" onClick={onEdit} className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-primary" aria-label="Edit">
+          <PencilSquareIcon className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={deleting || deleteDisabled}
+          className="rounded-lg p-2 text-slate-600 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Delete"
+        >
+          <TrashIcon className="h-5 w-5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({ text }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-medium text-slate-500">
       {text}
     </div>
-  );
-}
-
-function TableHead({ children }) {
-  return (
-    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-      {children}
-    </th>
   );
 }
