@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://3.250.102.248:2080/api";
+  import.meta.env.VITE_API_BASE_URL || "https://d25x8zzf939iqa.cloudfront.net/api";
 
 export const ROOT_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
