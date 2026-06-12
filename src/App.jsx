@@ -1,22 +1,113 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Login from './pages/login';
-import Register from './pages/register';
-import Profile from './pages/profile';
-import ProtectedRoute from './components/ProtectedRoute';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import Admin from "./pages/Admin";
+import BPOAnalysis from "./pages/BPOAnalysis";
+import Login from "./pages/login";
+import Register from "./pages/register";
+import Profile from "./pages/profile";
+import Dashboard from "./pages/Dashboard";
+import Events from "./pages/Events";
+import FileUploads from "./pages/FileUploads";
+import UserChat from "./pages/UserChat";
+import FaceLogin from "./pages/FaceLogin";
+import ForgotPassword from "./pages/ForgotPassword";
+import HelpDesk from "./pages/helpdesk";
+import Chatbot from "./pages/Chatbot";
+import UpdatePassword from "./pages/UpdatePassword";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
+  const defaultRoute = localStorage.getItem("token") ? "/dashboard" : "/login";
+
   return (
     <Router>
       <Routes>
+        <Route path="/" element={<Navigate to={defaultRoute} replace />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/face-login" element={<FaceLogin />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/profile" element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } />
-        <Route path="*" element={<Login />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/update-password"
+          element={
+            <ProtectedRoute>
+              <UpdatePassword />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events"
+          element={
+            <ProtectedRoute>
+              <Events />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user-chat"
+          element={
+            <ProtectedRoute>
+              <UserChat />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/helpdesk"
+          element={
+            <ProtectedRoute>
+              <HelpDesk />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chatbot"
+          element={
+            <ProtectedRoute>
+              <Chatbot />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bpo"
+          element={
+            <ProtectedRoute>
+              <BPOAnalysis />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/uploads"
+          element={
+            <ProtectedRoute>
+              <FileUploads />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <Admin />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to={defaultRoute} replace />} />
       </Routes>
     </Router>
   );
