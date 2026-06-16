@@ -15,6 +15,7 @@ import DashboardLayout from "../components/DashboardLayout";
 import FaceScanGuide from "../components/FaceScanGuide";
 import UserAvatar from "../components/UserAvatar";
 import api, { getApiError, saveSession } from "../services/api";
+import { getCameraErrorMessage, requestUserCamera } from "../utils/camera";
 import { formatDate, titleize } from "../utils/formatters";
 
 export default function Profile() {
@@ -57,10 +58,10 @@ export default function Profile() {
     let stream;
     async function startWebcam() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream = await requestUserCamera();
         if (videoRef.current) videoRef.current.srcObject = stream;
-      } catch {
-        setError("Cannot access camera. Check browser permissions.");
+      } catch (err) {
+        setError(getCameraErrorMessage(err));
       }
     }
 

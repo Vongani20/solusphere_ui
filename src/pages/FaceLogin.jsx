@@ -6,6 +6,7 @@ import {
 } from "@heroicons/react/24/outline";
 import FaceScanGuide from "../components/FaceScanGuide";
 import api, { getApiError, saveSession } from "../services/api";
+import { getCameraErrorMessage, requestUserCamera } from "../utils/camera";
 
 export default function FaceLogin() {
   const [capturedImage, setCapturedImage] = useState(null);
@@ -20,10 +21,10 @@ export default function FaceLogin() {
 
     async function startWebcam() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream = await requestUserCamera();
         if (videoRef.current) videoRef.current.srcObject = stream;
-      } catch {
-        setError("Cannot access camera. Check browser permissions.");
+      } catch (err) {
+        setError(getCameraErrorMessage(err));
       }
     }
 

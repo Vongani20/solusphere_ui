@@ -23,6 +23,20 @@ export function resolveImageUrl(value) {
   const raw = String(value).trim().replace(/\\/g, "/");
   if (!raw) return "";
 
+  try {
+    const url = new URL(raw);
+    const isBackendUpload =
+      url.protocol === "http:" &&
+      url.port === "2080" &&
+      (url.hostname === "3.250.102.248" || url.hostname === "ec2-3-250-102-248.eu-west-1.compute.amazonaws.com");
+
+    if (isBackendUpload) {
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+  } catch {
+    // Non-URL values are handled below.
+  }
+
   if (/^https?:\/\//i.test(raw)) {
     return raw;
   }
