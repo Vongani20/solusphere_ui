@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  ArrowDownTrayIcon,
   ArrowPathIcon,
   CalendarDaysIcon,
+  DocumentTextIcon,
   EnvelopeIcon,
   PencilSquareIcon,
   PhoneIcon,
@@ -43,6 +45,7 @@ const tabs = [
   { id: "users", label: "Users", icon: UserIcon },
   { id: "events", label: "Events", icon: CalendarDaysIcon },
   { id: "helpdesk", label: "Helpdesk", icon: TicketIcon },
+  { id: "cvs", label: "CV Management", icon: DocumentTextIcon },
 ];
 
 export default function Admin() {
@@ -73,6 +76,13 @@ export default function Admin() {
   const [editingTicketID, setEditingTicketID] = useState(null);
   const [savingTicket, setSavingTicket] = useState(false);
   const [deletingTicketID, setDeletingTicketID] = useState(null);
+
+  const [cvs, setCvs] = useState([]);
+  const [cvSearchSkill, setCvSearchSkill] = useState("");
+  const [cvSearchQualification, setCvSearchQualification] = useState("");
+  const [loadingCvs, setLoadingCvs] = useState(false);
+  const [selectedCv, setSelectedCv] = useState(null);
+  const [downloadingCvId, setDownloadingCvId] = useState(null);
 
   const selectedUser = useMemo(
     () => users.find((user) => user.id === editingUserID),
@@ -137,6 +147,57 @@ export default function Admin() {
       }
     };
   }, [eventImagePreview]);
+
+  useEffect(() => {
+    if (activeTab === "cvs" && cvs.length === 0) loadCvs();
+  }, [activeTab]);
+
+  const loadCvs = async () => {
+    setLoadingCvs(true);
+    setError("");
+    try {
+      const res = await api.get("/admin/cvs", {
+        params: {
+          skill: cvSearchSkill || undefined,
+          qualification: cvSearchQualification || undefined,
+        },
+      });
+      setCvs(res.data.cvs || []);
+    } catch (err) {
+      showError(err, "Failed to load CVs.");
+    } finally {
+      setLoadingCvs(false);
+    }
+  };
+
+  const viewCv = async (userId) => {
+    setError("");
+    try {
+      const res = await api.get(`/admin/cvs/${userId}`);
+      setSelectedCv(res.data.cv);
+    } catch (err) {
+      showError(err, "Failed to load CV detail.");
+    }
+  };
+
+  const downloadCvPdf = async (userId, name) => {
+    setDownloadingCvId(userId);
+    try {
+      const res = await api.get(`/admin/cvs/${userId}/download`, { responseType: "blob" });
+      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name || "cv"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showError(err, "PDF download failed.");
+    } finally {
+      setDownloadingCvId(null);
+    }
+  };
 
   const showSuccess = (text) => {
     setMessage(text);
@@ -445,10 +506,11 @@ export default function Admin() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:grid-cols-4">
             <SummaryTile label="Users" value={users.length} />
             <SummaryTile label="Events" value={events.length} />
             <SummaryTile label="Tickets" value={tickets.length} />
+            <SummaryTile label="CVs" value={cvs.length} />
           </div>
         </section>
 
@@ -720,6 +782,232 @@ export default function Admin() {
             </DataCard>
           </section>
         )}
+
+        {activeTab === "cvs" && (
+          <section className="space-y-6">
+            {/* Search filters */}
+            <div className="card">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
+                  <DocumentTextIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-950">CV Management</h2>
+                  <p className="text-sm text-slate-500">Search and download candidate CVs</p>
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Skill</span>
+                  <input
+                    className="input"
+                    value={cvSearchSkill}
+                    onChange={(e) => setCvSearchSkill(e.target.value)}
+                    placeholder="e.g. Python"
+                    onKeyDown={(e) => e.key === "Enter" && loadCvs()}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Qualification</span>
+                  <input
+                    className="input"
+                    value={cvSearchQualification}
+                    onChange={(e) => setCvSearchQualification(e.target.value)}
+                    placeholder="e.g. BSc"
+                    onKeyDown={(e) => e.key === "Enter" && loadCvs()}
+                  />
+                </label>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={loadCvs}
+                    disabled={loadingCvs}
+                    className="btn btn-primary inline-flex w-full items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <ArrowPathIcon className={`h-4 w-4 ${loadingCvs ? "animate-spin" : ""}`} />
+                    {loadingCvs ? "Searching…" : "Search"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* CV list */}
+            <div className="card">
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-sm text-slate-500">{cvs.length} CV{cvs.length !== 1 ? "s" : ""} found</p>
+                <button
+                  type="button"
+                  onClick={loadCvs}
+                  className="btn btn-secondary inline-flex items-center gap-2"
+                >
+                  <ArrowPathIcon className={`h-4 w-4 ${loadingCvs ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+              </div>
+              {cvs.length === 0 ? (
+                <EmptyState text={loadingCvs ? "Loading CVs…" : "No CVs found"} />
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {["Name", "Top Skills", "Qualifications", "Updated", "Actions"].map((h) => (
+                          <th
+                            key={h}
+                            className="whitespace-nowrap px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {cvs.map((cv) => (
+                        <tr key={cv.user_id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">
+                            {cv.first_name} {cv.last_name}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600 max-w-xs truncate">
+                            {cv.professional_skills?.map((s) => s.skill).filter(Boolean).join(", ") || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600 max-w-xs truncate">
+                            {cv.qualifications?.filter(Boolean).join(", ") || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
+                            {formatDate(cv.updated_at)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => viewCv(cv.user_id)}
+                                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-primary border border-primary hover:bg-primary hover:text-white transition"
+                              >
+                                View
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => downloadCvPdf(cv.user_id, `${cv.first_name}_${cv.last_name}`)}
+                                disabled={downloadingCvId === cv.user_id}
+                                className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition"
+                              >
+                                <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                                {downloadingCvId === cv.user_id ? "…" : "PDF"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* CV detail panel */}
+            {selectedCv && (
+              <div className="card space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {selectedCv.profile_photo_url ? (
+                      <img
+                        src={resolveImageUrl(selectedCv.profile_photo_url)}
+                        alt="Profile"
+                        className="h-14 w-14 rounded-full object-cover border-2 border-slate-200"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+                        <PhotoIcon className="h-7 w-7 text-slate-400" />
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-950">
+                        {selectedCv.first_name} {selectedCv.last_name}
+                      </h3>
+                      <p className="text-sm text-slate-500">
+                        {selectedCv.nationality} · {selectedCv.gender} · DOB: {selectedCv.date_of_birth}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => downloadCvPdf(selectedCv.user_id, `${selectedCv.first_name}_${selectedCv.last_name}`)}
+                      disabled={downloadingCvId === selectedCv.user_id}
+                      className="btn btn-primary inline-flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      {downloadingCvId === selectedCv.user_id ? "Downloading…" : "Download PDF"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCv(null)}
+                      className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <CvDetailSection title="Profile">
+                    <p className="text-sm text-slate-700">{selectedCv.profile_text || "—"}</p>
+                  </CvDetailSection>
+                  <CvDetailSection title="Value Proposition">
+                    <p className="text-sm text-slate-700">{selectedCv.value_proposition || "—"}</p>
+                  </CvDetailSection>
+                  <CvDetailSection title="Languages">
+                    <CvDetailList items={selectedCv.languages} />
+                  </CvDetailSection>
+                  <CvDetailSection title="Professional Skills">
+                    {selectedCv.professional_skills?.map((s, i) => (
+                      <div key={i} className="mb-1">
+                        <p className="text-sm font-medium text-slate-800">{s.skill}</p>
+                        {s.details?.filter(Boolean).length > 0 && (
+                          <p className="text-xs text-slate-500">{s.details.join(", ")}</p>
+                        )}
+                      </div>
+                    ))}
+                  </CvDetailSection>
+                  <CvDetailSection title="Qualifications">
+                    <CvDetailList items={selectedCv.qualifications} />
+                  </CvDetailSection>
+                  <CvDetailSection title="Computer Skills">
+                    <CvDetailList items={selectedCv.computer_skills} />
+                  </CvDetailSection>
+                  {selectedCv.professional_memberships?.filter(Boolean).length > 0 && (
+                    <CvDetailSection title="Memberships">
+                      <CvDetailList items={selectedCv.professional_memberships} />
+                    </CvDetailSection>
+                  )}
+                </div>
+
+                {selectedCv.experience?.length > 0 && (
+                  <CvDetailSection title="Experience">
+                    <div className="space-y-3">
+                      {selectedCv.experience.map((exp, i) => (
+                        <div key={i} className="rounded-lg border border-slate-100 p-3">
+                          <p className="text-sm font-semibold text-slate-800">{exp.company}</p>
+                          <p className="text-sm text-slate-600">{exp.position}</p>
+                          <p className="text-xs text-slate-400">
+                            {exp.period_start} – {exp.period_end || "Present"}
+                          </p>
+                          {exp.scope_of_work?.filter(Boolean).length > 0 && (
+                            <ul className="ml-4 mt-1 list-disc text-xs text-slate-600">
+                              {exp.scope_of_work.filter(Boolean).map((s, si) => (
+                                <li key={si}>{s}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CvDetailSection>
+                )}
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </DashboardLayout>
   );
@@ -862,5 +1150,26 @@ function EmptyState({ text }) {
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-medium text-slate-500">
       {text}
     </div>
+  );
+}
+
+function CvDetailSection({ title, children }) {
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+      <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function CvDetailList({ items }) {
+  const filtered = (items || []).filter(Boolean);
+  if (!filtered.length) return <p className="text-xs text-slate-400">None</p>;
+  return (
+    <ul className="list-disc ml-4 space-y-0.5 text-sm text-slate-700">
+      {filtered.map((item, i) => (
+        <li key={i}>{item}</li>
+      ))}
+    </ul>
   );
 }

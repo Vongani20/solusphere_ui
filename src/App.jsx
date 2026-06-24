@@ -14,6 +14,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import HelpDesk from "./pages/helpdesk";
 import Chatbot from "./pages/Chatbot";
 import UpdatePassword from "./pages/UpdatePassword";
+import CVBuilder from "./pages/CVBuilder";
 import AdminRoute from "./components/AdminRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -97,6 +98,14 @@ function App() {
           element={
             <ProtectedRoute>
               <FileUploads />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cv-builder"
+          element={
+            <ProtectedRoute>
+              <CVBuilder />
             </ProtectedRoute>
           }
         />
