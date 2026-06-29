@@ -60,7 +60,6 @@ run("aws", [
   "sync",
   dist,
   `s3://${bucket}`,
-  "--delete",
   "--exclude",
   "index.html",
   "--cache-control",

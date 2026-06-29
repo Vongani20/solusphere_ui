@@ -17,6 +17,7 @@ dist-ssr
 *.local
 wireframe-*
 scripts/cf-update.json
+scripts/cloudfront-function-config.json
 
 # Editor directories and files
 .vscode/*

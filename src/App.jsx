@@ -16,6 +16,7 @@ import Chatbot from "./pages/Chatbot";
 import UpdatePassword from "./pages/UpdatePassword";
 import CVBuilder from "./pages/CVBuilder";
 import AdminRoute from "./components/AdminRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -23,7 +24,8 @@ function App() {
 
   return (
     <Router>
-      <Routes>
+      <ErrorBoundary>
+        <Routes>
         <Route path="/" element={<Navigate to={defaultRoute} replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/face-login" element={<FaceLogin />} />
@@ -120,7 +122,8 @@ function App() {
           }
         />
         <Route path="*" element={<Navigate to={defaultRoute} replace />} />
-      </Routes>
+        </Routes>
+      </ErrorBoundary>
     </Router>
   );
 }

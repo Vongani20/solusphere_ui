@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowDownTrayIcon,
   CheckCircleIcon,
@@ -38,6 +39,102 @@ const defaultForm = () => ({
   experience: [emptyExperience()],
 });
 
+const normalizeStringList = (list) =>
+  Array.isArray(list) && list.length ? list : [""];
+
+const normalizeSkills = (skills) => {
+  if (!Array.isArray(skills) || !skills.length) return [emptySkill()];
+  return skills.map((s) => ({
+    skill: s?.skill ?? "",
+    details: Array.isArray(s?.details) && s.details.length ? s.details : [""],
+  }));
+};
+
+const normalizeExperienceList = (experience) => {
+  if (!Array.isArray(experience) || !experience.length) return [emptyExperience()];
+  return experience.map((exp) => ({
+    company: exp?.company ?? "",
+    position: exp?.position ?? "",
+    period_start: exp?.period_start ?? "",
+    period_end: exp?.period_end ?? "",
+    scope_of_work:
+      Array.isArray(exp?.scope_of_work) && exp.scope_of_work.length
+        ? exp.scope_of_work
+        : [""],
+  }));
+};
+
+const FORM_STRING_FIELDS = [
+  "first_name",
+  "last_name",
+  "profile_photo_url",
+  "profile_text",
+  "value_proposition",
+  "gender",
+  "nationality",
+  "date_of_birth",
+];
+
+const FACE_REQUIRED_MESSAGE =
+  "Register your face in Profile before using the CV Builder.";
+
+const cleanStringList = (items) => {
+  const cleaned = (items ?? []).map((item) => String(item).trim()).filter(Boolean);
+  return cleaned.length ? cleaned : [""];
+};
+
+const prepareFormForSave = (form) => ({
+  first_name: form.first_name.trim(),
+  last_name: form.last_name.trim(),
+  profile_text: form.profile_text.trim(),
+  value_proposition: form.value_proposition.trim(),
+  gender: form.gender,
+  nationality: form.nationality.trim(),
+  date_of_birth: form.date_of_birth,
+  professional_skills: form.professional_skills.map((skill) => ({
+    skill: String(skill.skill ?? "").trim(),
+    details: cleanStringList(skill.details),
+  })),
+  qualifications: cleanStringList(form.qualifications),
+  computer_skills: cleanStringList(form.computer_skills),
+  professional_memberships: cleanStringList(form.professional_memberships),
+  languages: cleanStringList(form.languages),
+  experience: form.experience.map((exp) => ({
+    company: String(exp.company ?? "").trim(),
+    position: String(exp.position ?? "").trim(),
+    period_start: String(exp.period_start ?? "").trim(),
+    period_end: String(exp.period_end ?? "").trim(),
+    scope_of_work: cleanStringList(exp.scope_of_work),
+  })),
+});
+
+const cvApiError = (err, fallback) => {
+  if (err?.response?.status === 428) {
+    return { message: getApiError(err, FACE_REQUIRED_MESSAGE), faceRequired: true };
+  }
+  return { message: getApiError(err, fallback), faceRequired: false };
+};
+
+const normalizeCv = (cv) => {
+  const base = defaultForm();
+  if (!cv || typeof cv !== "object") return base;
+
+  const merged = { ...base, ...cv };
+  for (const field of FORM_STRING_FIELDS) {
+    merged[field] = merged[field] == null ? "" : String(merged[field]);
+  }
+
+  return {
+    ...merged,
+    professional_skills: normalizeSkills(cv.professional_skills),
+    qualifications: normalizeStringList(cv.qualifications),
+    computer_skills: normalizeStringList(cv.computer_skills),
+    professional_memberships: normalizeStringList(cv.professional_memberships),
+    languages: normalizeStringList(cv.languages),
+    experience: normalizeExperienceList(cv.experience),
+  };
+};
+
 export default function CVBuilder() {
   const [form, setForm] = useState(defaultForm());
   const [step, setStep] = useState(1);
@@ -49,6 +146,7 @@ export default function CVBuilder() {
   const [photoFileInputKey, setPhotoFileInputKey] = useState(0);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [faceRequired, setFaceRequired] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const photoBlobRef = useRef(null);
 
@@ -56,27 +154,18 @@ export default function CVBuilder() {
     api
       .get("/cv")
       .then((res) => {
-        const cv = res.data.cv;
-        setForm((prev) => ({
-          ...prev,
-          ...cv,
-          professional_skills: cv.professional_skills?.length
-            ? cv.professional_skills
-            : [emptySkill()],
-          qualifications: cv.qualifications?.length ? cv.qualifications : [""],
-          computer_skills: cv.computer_skills?.length ? cv.computer_skills : [""],
-          professional_memberships: cv.professional_memberships?.length
-            ? cv.professional_memberships
-            : [""],
-          languages: cv.languages?.length ? cv.languages : [""],
-          experience: cv.experience?.length ? cv.experience : [emptyExperience()],
-        }));
-        if (cv.profile_photo_url) setPhotoPreview(resolveImageUrl(cv.profile_photo_url));
+        const formData = normalizeCv(res.data?.cv);
+        setForm(formData);
+        if (formData.profile_photo_url) {
+          setPhotoPreview(resolveImageUrl(formData.profile_photo_url));
+        }
       })
       .catch((err) => {
-        if (err?.response?.status !== 404) {
-          setError(getApiError(err, "Failed to load your CV."));
-        }
+        const status = err?.response?.status;
+        if (status === 404) return;
+        const { message, faceRequired: needsFace } = cvApiError(err, "Failed to load your CV.");
+        setError(message);
+        setFaceRequired(needsFace);
       })
       .finally(() => setLoading(false));
 
@@ -184,11 +273,13 @@ export default function CVBuilder() {
   const saveAndNext = async (nextStep) => {
     setSaving(true);
     setError("");
+    setFaceRequired(false);
     setMessage("");
     setFieldErrors({});
     try {
-      const res = await api.post("/cv", form);
-      setForm((prev) => ({ ...prev, ...res.data.cv }));
+      const payload = prepareFormForSave(form);
+      const res = await api.post("/cv", payload);
+      setForm(normalizeCv({ ...form, ...(res.data?.cv || {}) }));
       if (nextStep) {
         setStep(nextStep);
       } else {
@@ -197,7 +288,12 @@ export default function CVBuilder() {
     } catch (err) {
       const data = err?.response?.data;
       if (data?.fields) setFieldErrors(data.fields);
-      setError(getApiError(err, "Save failed. Check the highlighted fields."));
+      const { message, faceRequired: needsFace } = cvApiError(
+        err,
+        "Save failed. Check the highlighted fields."
+      );
+      setError(message);
+      setFaceRequired(needsFace);
     } finally {
       setSaving(false);
     }
@@ -208,6 +304,7 @@ export default function CVBuilder() {
     if (!file) return;
     setUploadingPhoto(true);
     setError("");
+    setFaceRequired(false);
     setMessage("");
     const formData = new FormData();
     formData.append("photo", file);
@@ -221,7 +318,9 @@ export default function CVBuilder() {
       setPhotoFileInputKey((k) => k + 1);
       setMessage("Photo updated.");
     } catch (err) {
-      setError(getApiError(err, "Photo upload failed."));
+      const { message, faceRequired: needsFace } = cvApiError(err, "Photo upload failed.");
+      setError(message);
+      setFaceRequired(needsFace);
     } finally {
       setUploadingPhoto(false);
     }
@@ -230,6 +329,7 @@ export default function CVBuilder() {
   const downloadPDF = async () => {
     setDownloading(true);
     setError("");
+    setFaceRequired(false);
     try {
       const res = await api.get("/cv/download", { responseType: "blob" });
       const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
@@ -241,7 +341,12 @@ export default function CVBuilder() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(getApiError(err, "PDF download failed. Make sure your CV is saved first."));
+      const { message, faceRequired: needsFace } = cvApiError(
+        err,
+        "PDF download failed. Make sure your CV is saved first."
+      );
+      setError(message);
+      setFaceRequired(needsFace);
     } finally {
       setDownloading(false);
     }
@@ -273,7 +378,15 @@ export default function CVBuilder() {
 
         {error && (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-            {error}
+            <p>{error}</p>
+            {faceRequired && (
+              <Link
+                to="/profile"
+                className="mt-2 inline-flex text-xs font-bold text-primary hover:underline"
+              >
+                Go to Profile to register your face →
+              </Link>
+            )}
           </div>
         )}
         {message && (
@@ -492,7 +605,7 @@ function Step2({
             </div>
             <div className="ml-4 space-y-2">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Details</p>
-              {skill.details.map((detail, di) => (
+              {(skill.details ?? []).map((detail, di) => (
                 <div key={di} className="flex items-center gap-2">
                   <input
                     className="input flex-1 text-sm"
@@ -500,7 +613,7 @@ function Step2({
                     onChange={(e) => updateSkillDetail(si, di, e.target.value)}
                     placeholder="e.g. Agile, PMP certified"
                   />
-                  {skill.details.length > 1 && (
+                  {(skill.details ?? []).length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeSkillDetail(si, di)}
@@ -678,7 +791,7 @@ function Step3({
           <div>
             <FieldLabel text="Scope of Work" />
             <div className="mt-2 space-y-2">
-              {exp.scope_of_work.map((item, si) => (
+              {(exp.scope_of_work ?? []).map((item, si) => (
                 <div key={si} className="flex items-center gap-2">
                   <input
                     className="input flex-1 text-sm"
@@ -686,7 +799,7 @@ function Step3({
                     onChange={(e) => updateScopeItem(ei, si, e.target.value)}
                     placeholder="Describe a key responsibility or achievement"
                   />
-                  {exp.scope_of_work.length > 1 && (
+                  {(exp.scope_of_work ?? []).length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeScopeItem(ei, si)}
@@ -775,9 +888,9 @@ function Step4({
             {form.professional_skills.map((s, i) => (
               <div key={i} className="mb-2">
                 <p className="text-sm font-medium text-slate-800">{s.skill || "—"}</p>
-                {s.details.filter(Boolean).length > 0 && (
+                {(s.details ?? []).filter(Boolean).length > 0 && (
                   <ul className="ml-4 mt-1 list-disc text-sm text-slate-600">
-                    {s.details.filter(Boolean).map((d, di) => (
+                    {(s.details ?? []).filter(Boolean).map((d, di) => (
                       <li key={di}>{d}</li>
                     ))}
                   </ul>
@@ -816,9 +929,9 @@ function Step4({
                     {exp.period_start} – {exp.period_end || "Present"}
                   </p>
                 )}
-                {exp.scope_of_work.filter(Boolean).length > 0 && (
+                {(exp.scope_of_work ?? []).filter(Boolean).length > 0 && (
                   <ul className="ml-4 mt-1 list-disc text-sm text-slate-600">
-                    {exp.scope_of_work.filter(Boolean).map((s, si) => (
+                    {(exp.scope_of_work ?? []).filter(Boolean).map((s, si) => (
                       <li key={si}>{s}</li>
                     ))}
                   </ul>
@@ -830,7 +943,7 @@ function Step4({
 
         {/* Right — photo upload + download */}
         <div className="space-y-4">
-          <div className="card space-y-4 hidden">
+          <div className="card space-y-4">
             <SectionHeader title="Profile Photo" />
             <div className="flex flex-col items-center gap-4">
               {photoPreview ? (
@@ -959,9 +1072,10 @@ function FieldError({ errors, field }) {
 }
 
 function DynamicStringList({ items, onAdd, onRemove, onChange, minItems, placeholder }) {
+  const list = Array.isArray(items) ? items : [""];
   return (
     <div className="space-y-2">
-      {items.map((item, i) => (
+      {list.map((item, i) => (
         <div key={i} className="flex items-center gap-2">
           <input
             className="input flex-1"
@@ -969,7 +1083,7 @@ function DynamicStringList({ items, onAdd, onRemove, onChange, minItems, placeho
             onChange={(e) => onChange(i, e.target.value)}
             placeholder={placeholder}
           />
-          {items.length > minItems && (
+          {list.length > minItems && (
             <button
               type="button"
               onClick={() => onRemove(i)}

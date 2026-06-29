@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "node scripts/deploy.mjs",
-    "deploy:s3": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-s3.ps1"
+    "deploy:s3": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-s3.ps1",
+    "configure:cloudfront": "node scripts/configure-cloudfront-spa.mjs"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

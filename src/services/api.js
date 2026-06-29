@@ -43,13 +43,18 @@ export function getApiError(error, fallback = "Something went wrong.") {
     return "Network error — could not reach the server. Check your connection and try again.";
   }
 
-  return (
-    error?.response?.data?.error ||
-    error?.response?.data?.message ||
-    error?.response?.data?.details ||
-    error?.message ||
-    fallback
-  );
+  const data = error?.response?.data;
+  const candidate =
+    data?.error ||
+    data?.message ||
+    (typeof data?.details === "string" ? data.details : null) ||
+    error?.message;
+
+  if (typeof candidate === "string" && candidate.trim()) {
+    return candidate;
+  }
+
+  return fallback;
 }
 
 api.interceptors.request.use(
