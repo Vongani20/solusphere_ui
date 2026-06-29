@@ -1,3 +1,16 @@
+export function formatDateOnly(value) {
+  if (!value) return "Not available";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    const raw = String(value).trim();
+    return raw.length >= 10 ? raw.slice(0, 10) : raw || "Not available";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+  }).format(date);
+}
+
 export function formatDate(value) {
   if (!value) return "Not available";
   const date = new Date(value);

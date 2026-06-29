@@ -18,7 +18,7 @@ import {
 import DashboardLayout from "../components/DashboardLayout";
 import api, { getApiError, saveSession } from "../services/api";
 import { resolveImageUrl } from "../utils/assets";
-import { formatDate, statusTone, titleize } from "../utils/formatters";
+import { formatDate, formatDateOnly, statusTone, titleize } from "../utils/formatters";
 
 const emptyUserForm = {
   username: "",
@@ -925,7 +925,7 @@ export default function Admin() {
                   <table className="min-w-full divide-y divide-slate-200">
                     <thead className="bg-slate-50">
                       <tr>
-                        {["Name", "Top Skills", "Qualifications", "Updated", "Actions"].map((h) => (
+                        {["Photo", "Name", "Top Skills", "Qualifications", "Updated", "Actions"].map((h) => (
                           <th
                             key={h}
                             className="whitespace-nowrap px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
@@ -938,6 +938,9 @@ export default function Admin() {
                     <tbody className="divide-y divide-slate-100 bg-white">
                       {cvs.map((cv) => (
                         <tr key={cv.user_id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3">
+                            <CvSearchPhoto photoUrl={cv.profile_photo_url} name={`${cv.first_name} ${cv.last_name}`} />
+                          </td>
                           <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">
                             {cv.first_name} {cv.last_name}
                           </td>
@@ -984,10 +987,10 @@ export default function Admin() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {selectedCv.profile_photo_url ? (
-                      <img
-                        src={resolveImageUrl(selectedCv.profile_photo_url)}
-                        alt="Profile"
-                        className="h-14 w-14 rounded-full object-cover border-2 border-slate-200"
+                      <CvSearchPhoto
+                        photoUrl={selectedCv.profile_photo_url}
+                        name={`${selectedCv.first_name} ${selectedCv.last_name}`}
+                        size="lg"
                       />
                     ) : (
                       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
@@ -999,7 +1002,7 @@ export default function Admin() {
                         {selectedCv.first_name} {selectedCv.last_name}
                       </h3>
                       <p className="text-sm text-slate-500">
-                        {selectedCv.nationality} · {selectedCv.gender} · DOB: {selectedCv.date_of_birth}
+                        {selectedCv.nationality} · {selectedCv.gender} · DOB: {formatDateOnly(selectedCv.date_of_birth)}
                       </p>
                     </div>
                   </div>
@@ -1224,6 +1227,29 @@ function EmptyState({ text }) {
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-medium text-slate-500">
       {text}
     </div>
+  );
+}
+
+function CvSearchPhoto({ photoUrl, name, size = "sm" }) {
+  const [failed, setFailed] = useState(false);
+  const src = resolveImageUrl(photoUrl);
+  const classes = size === "lg" ? "h-14 w-14 border-2" : "h-10 w-10 border";
+
+  if (!src || failed) {
+    return (
+      <div className={`flex ${classes} items-center justify-center rounded-full border-slate-200 bg-slate-100`}>
+        <PhotoIcon className={`${size === "lg" ? "h-7 w-7" : "h-5 w-5"} text-slate-400`} />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name ? `${name} profile` : "Profile"}
+      className={`${classes} rounded-full object-cover border-slate-200`}
+      onError={() => setFailed(true)}
+    />
   );
 }
 
