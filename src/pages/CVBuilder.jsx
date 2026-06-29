@@ -3,12 +3,15 @@ import { Link } from "react-router-dom";
 import {
   ArrowDownTrayIcon,
   CheckCircleIcon,
+  DocumentArrowUpIcon,
   PlusIcon,
   PhotoIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
+import DocumentConsentModal from "../components/DocumentConsentModal";
 import api, { getApiError } from "../services/api";
+import { useDocumentProcessingConsent } from "../hooks/useDocumentProcessingConsent";
 import { resolveImageUrl } from "../utils/assets";
 
 const STEPS = ["Personal Info", "Skills & Qualifications", "Experience", "Review & Download"];
@@ -168,6 +171,9 @@ export default function CVBuilder() {
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [importingCv, setImportingCv] = useState(false);
+  const [importWarnings, setImportWarnings] = useState([]);
+  const [cvFileInputKey, setCvFileInputKey] = useState(0);
   const [photoPreview, setPhotoPreview] = useState("");
   const [photoFileInputKey, setPhotoFileInputKey] = useState(0);
   const [message, setMessage] = useState("");
@@ -175,6 +181,14 @@ export default function CVBuilder() {
   const [faceRequired, setFaceRequired] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const photoBlobRef = useRef(null);
+  const pendingImportFileRef = useRef(null);
+  const {
+    hasConsent,
+    signConsent,
+    signing: consentSigning,
+    error: consentError,
+  } = useDocumentProcessingConsent();
+  const [consentOpen, setConsentOpen] = useState(false);
 
   useEffect(() => {
     api
@@ -330,6 +344,67 @@ export default function CVBuilder() {
     }
   };
 
+  const runCvImport = async (file) => {
+    setImportingCv(true);
+    setError("");
+    setFaceRequired(false);
+    setMessage("");
+    setImportWarnings([]);
+
+    const formData = new FormData();
+    formData.append("document", file);
+
+    try {
+      const res = await api.post("/cv/import", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const imported = normalizeCv(res.data?.cv);
+      setForm((prev) => ({
+        ...imported,
+        profile_photo_url: prev.profile_photo_url || imported.profile_photo_url,
+      }));
+      setImportWarnings(Array.isArray(res.data?.warnings) ? res.data.warnings : []);
+      setMessage(res.data?.message || "CV imported. Review each step and save when ready.");
+      setStep(1);
+    } catch (err) {
+      const { message, faceRequired: needsFace } = cvApiError(
+        err,
+        "Could not import CV. Upload a text-based PDF and try again."
+      );
+      setError(message);
+      setFaceRequired(needsFace);
+    } finally {
+      setImportingCv(false);
+    }
+  };
+
+  const importCvDocument = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCvFileInputKey((k) => k + 1);
+
+    if (!hasConsent) {
+      pendingImportFileRef.current = file;
+      setConsentOpen(true);
+      return;
+    }
+
+    await runCvImport(file);
+  };
+
+  const handleConsentSigned = async (signedName) => {
+    const ok = await signConsent(signedName);
+    if (!ok) return false;
+
+    setConsentOpen(false);
+    if (pendingImportFileRef.current) {
+      const file = pendingImportFileRef.current;
+      pendingImportFileRef.current = null;
+      await runCvImport(file);
+    }
+    return true;
+  };
+
   const uploadPhoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -401,8 +476,38 @@ export default function CVBuilder() {
         <div>
           <h1 className="text-sm font-bold text-heading">CV Builder</h1>
           <p className="mt-0.5 text-[9px] font-medium text-muted">
-            Build your branded SoluGrowth CV → download PDF
+            Upload an existing CV PDF to pre-fill the form, or build your branded SoluGrowth CV step by step
           </p>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-bold text-heading">Import from PDF</p>
+              <p className="mt-0.5 text-[9px] text-muted">
+                AI reads your CV and fills the wizard. Review every field before saving.
+              </p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+              <DocumentArrowUpIcon className="h-4 w-4" />
+              {importingCv ? "Importing..." : "Upload CV (PDF)"}
+              <input
+                key={cvFileInputKey}
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                disabled={importingCv}
+                onChange={importCvDocument}
+              />
+            </label>
+          </div>
+          {importWarnings.length > 0 && (
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-[10px] text-amber-800">
+              {importWarnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <StepIndicator current={step} />
@@ -484,6 +589,17 @@ export default function CVBuilder() {
           />
         )}
       </div>
+
+      <DocumentConsentModal
+        open={consentOpen}
+        onClose={() => {
+          setConsentOpen(false);
+          pendingImportFileRef.current = null;
+        }}
+        onSigned={handleConsentSigned}
+        signing={consentSigning}
+        error={consentError}
+      />
     </DashboardLayout>
   );
 }

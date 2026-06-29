@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowPathIcon,
   DocumentArrowUpIcon,
@@ -7,7 +7,9 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
+import DocumentConsentModal from "../components/DocumentConsentModal";
 import api, { getApiError } from "../services/api";
+import { useDocumentProcessingConsent } from "../hooks/useDocumentProcessingConsent";
 import {
   formatDate,
   formatFileSize,
@@ -31,6 +33,14 @@ export default function BPOAnalysis() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [consentOpen, setConsentOpen] = useState(false);
+  const pendingUploadRef = useRef(false);
+  const {
+    hasConsent,
+    signConsent,
+    signing: consentSigning,
+    error: consentError,
+  } = useDocumentProcessingConsent();
 
   const loadAnalyses = useCallback(async () => {
     setLoading(true);
@@ -76,10 +86,7 @@ export default function BPOAnalysis() {
 
   const parsedResult = useMemo(() => parseAnalysisResult(selected?.analysis_result), [selected]);
 
-  const handleUpload = async (event) => {
-    event.preventDefault();
-    if (!file) return;
-
+  const runUpload = async (event) => {
     setUploading(true);
     setError("");
     setMessage("");
@@ -91,7 +98,7 @@ export default function BPOAnalysis() {
       const res = await api.post("/bpo/analyze-pdf", formData);
       setMessage(res.data.message || "Analysis started.");
       setFile(null);
-      event.target.reset();
+      if (event?.target?.reset) event.target.reset();
       await loadAnalyses();
       const detail = await api.get(`/bpo/analysis/${res.data.analysis_id}`);
       setSelected(detail.data.analysis);
@@ -100,6 +107,32 @@ export default function BPOAnalysis() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleUpload = async (event) => {
+    event.preventDefault();
+    if (!file) return;
+
+    if (!hasConsent) {
+      pendingUploadRef.current = event;
+      setConsentOpen(true);
+      return;
+    }
+
+    await runUpload(event);
+  };
+
+  const handleConsentSigned = async (signedName) => {
+    const ok = await signConsent(signedName);
+    if (!ok) return false;
+
+    setConsentOpen(false);
+    if (pendingUploadRef.current) {
+      const pendingEvent = pendingUploadRef.current;
+      pendingUploadRef.current = null;
+      await runUpload(pendingEvent);
+    }
+    return true;
   };
 
   const viewAnalysis = async (id) => {
@@ -337,6 +370,17 @@ export default function BPOAnalysis() {
           )}
         </section>
       </div>
+
+      <DocumentConsentModal
+        open={consentOpen}
+        onClose={() => {
+          setConsentOpen(false);
+          pendingUploadRef.current = null;
+        }}
+        onSigned={handleConsentSigned}
+        signing={consentSigning}
+        error={consentError}
+      />
     </DashboardLayout>
   );
 }
@@ -388,12 +432,32 @@ function StructuredResult({ data }) {
     );
   }
 
+  if (data.error) {
+    return (
+      <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+        {String(data.error)}
+      </div>
+    );
+  }
+
+  const extracted = data.extracted_data;
+  const summary =
+    extracted && typeof extracted === "object" && extracted.summary
+      ? String(extracted.summary)
+      : null;
+
   if (typeof data !== "object") {
     return <p className="break-words rounded-lg bg-slate-50 p-4 text-sm text-slate-700">{String(data)}</p>;
   }
 
   return (
     <div className="space-y-3">
+      {summary && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-primary">Summary</p>
+          <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-800">{summary}</p>
+        </div>
+      )}
       {Object.entries(data).map(([key, value]) => (
         <div key={key} className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-sm font-bold text-slate-950">{titleize(key)}</p>
