@@ -99,7 +99,7 @@ export default function Profile() {
       if (capturedImage?.url) URL.revokeObjectURL(capturedImage.url);
       setCapturedImage({ blob, url: URL.createObjectURL(blob) });
       setError("");
-    }, "image/jpeg");
+    }, "image/jpeg", 0.92);
   };
 
   const submitFace = async () => {
@@ -117,8 +117,8 @@ export default function Profile() {
 
     try {
       const request = user?.face_status
-        ? api.put("/face/update", formData, { headers: { "Content-Type": "multipart/form-data" } })
-        : api.post("/face/register", formData, { headers: { "Content-Type": "multipart/form-data" } });
+        ? api.put("/face/update", formData)
+        : api.post("/face/register", formData);
       const res = await request;
       setMessage(res.data.message || "Face profile saved.");
       setCapturedImage(null);
@@ -171,9 +171,7 @@ export default function Profile() {
                 <p className="truncate text-slate-500">{user?.email || "Email unavailable"}</p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <StatusPill active={user?.face_status} />
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200">
-                    {titleize(user?.role)}
-                  </span>
+                  <span className="status-pill-neutral">{titleize(user?.role)}</span>
                 </div>
               </div>
             </div>
@@ -272,8 +270,10 @@ export default function Profile() {
                     </button>
                   </>
                 ) : (
-                  <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-medium text-slate-500">
-                    No capture selected
+                  <div className="flex aspect-square items-center justify-center rounded-md border border-dashed border-border-muted bg-[#f3f5f7] p-6 text-center font-mono text-[9px] text-muted">
+                    captured
+                    <br />
+                    preview
                   </div>
                 )}
               </div>
@@ -295,7 +295,7 @@ export default function Profile() {
             />
             <div className="card">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-white">
                   <KeyIcon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
@@ -320,13 +320,13 @@ export default function Profile() {
 
 function StatusPill({ active }) {
   return active ? (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">
-      <CheckCircleIcon className="h-4 w-4" />
+    <span className="inline-flex items-center gap-1.5 face-badge">
+      <CheckCircleIcon className="h-3 w-3" />
       Face verified
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">
-      <XCircleIcon className="h-4 w-4" />
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#b07d20]/30 bg-[#fff4e0] px-2.5 py-0.5 text-[8px] font-bold text-[#b07d20]">
+      <XCircleIcon className="h-3 w-3" />
       Face pending
     </span>
   );
@@ -336,7 +336,7 @@ function InfoPanel({ icon: Icon, label, value, detail }) {
   return (
     <div className="card">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-white">
+        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-heading text-white">
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">

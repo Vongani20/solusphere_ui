@@ -177,7 +177,7 @@ export default function UserChat() {
                         {room.description || "Shared conversation"}
                       </p>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${statusTone(room.status)}`}>
+                    <span className={`shrink-0 ${statusTone(room.status)}`}>
                       {room.status}
                     </span>
                   </div>

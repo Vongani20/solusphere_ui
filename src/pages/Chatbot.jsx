@@ -404,8 +404,8 @@ export default function Chatbot() {
             <SparklesIcon className="h-6 w-6" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-slate-950">SIA Agent</h1>
-            <p className="text-sm text-slate-500">One search box for web, website analytics, and image context</p>
+            <h1 className="text-xs font-bold text-heading">SIA Agent</h1>
+            <p className="text-[8px] font-medium text-muted">Web · website analytics · image context</p>
           </div>
         </div>
 
@@ -416,8 +416,8 @@ export default function Chatbot() {
               return (
                 <div key={`${message.role}-${index}`} className={`flex items-start gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
                   <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                      isUser ? "bg-slate-900" : "bg-cyan-600"
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${
+                      isUser ? "bg-heading" : "bg-primary-light"
                     } text-white`}
                   >
                     {isUser ? <UserCircleIcon className="h-6 w-6" /> : <SparklesIcon className="h-6 w-6" />}
@@ -477,7 +477,7 @@ export default function Chatbot() {
 
             {loading && (
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-600 text-white">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary-light text-white">
                   <SparklesIcon className="h-6 w-6" />
                 </div>
                 <div className="rounded-lg bg-slate-100 px-4 py-3 text-sm font-medium text-slate-500">
@@ -523,7 +523,7 @@ export default function Chatbot() {
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                placeholder="Search, paste a website, ask for analytics, or describe an image..."
+                placeholder="Search, paste a website, ask for analytics…"
                 className="max-h-32 min-h-11 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0"
                 disabled={loading}
                 rows={1}

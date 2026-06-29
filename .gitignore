@@ -12,8 +12,11 @@ lerna-debug.log*
 
 node_modules
 dist
+.env
 dist-ssr
 *.local
+wireframe-*
+scripts/cf-update.json
 
 # Editor directories and files
 .vscode/*

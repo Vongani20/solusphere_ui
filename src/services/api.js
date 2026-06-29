@@ -36,6 +36,13 @@ export function clearSession() {
 }
 
 export function getApiError(error, fallback = "Something went wrong.") {
+  if (error?.message === "Network Error") {
+    if (window.location.protocol === "https:" && API_BASE_URL.startsWith("http:")) {
+      return "Cannot reach the API from this secure page. Use HTTPS for the API or open the app over HTTP.";
+    }
+    return "Network error — could not reach the server. Check your connection and try again.";
+  }
+
   return (
     error?.response?.data?.error ||
     error?.response?.data?.message ||
@@ -51,6 +58,19 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    if (config.data instanceof FormData) {
+      // Let axios set multipart boundary automatically.
+      if (config.headers?.delete) {
+        config.headers.delete("Content-Type");
+        config.headers.delete("content-type");
+      } else if (config.headers) {
+        delete config.headers["Content-Type"];
+        delete config.headers["content-type"];
+      }
+      config.timeout = config.timeout ?? 120000;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

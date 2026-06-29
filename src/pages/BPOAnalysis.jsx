@@ -88,9 +88,7 @@ export default function BPOAnalysis() {
     formData.append("document", file);
 
     try {
-      const res = await api.post("/bpo/analyze-pdf", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await api.post("/bpo/analyze-pdf", formData);
       setMessage(res.data.message || "Analysis started.");
       setFile(null);
       event.target.reset();
@@ -241,7 +239,7 @@ export default function BPOAnalysis() {
                             <p className="text-xs text-slate-500">{formatFileSize(analysis.file_size)}</p>
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${statusTone(analysis.status)}`}>
+                            <span className={statusTone(analysis.status)}>
                               {analysis.status || "pending"}
                             </span>
                           </td>
@@ -310,7 +308,7 @@ export default function BPOAnalysis() {
               </p>
             </div>
             {selected && (
-              <span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusTone(selected.status)}`}>
+              <span className={statusTone(selected.status)}>
                 {selected.status}
               </span>
             )}
@@ -374,9 +372,9 @@ function TableHead({ children }) {
 
 function DetailRow({ label, value }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-2 break-words text-sm font-semibold text-slate-900">{value}</p>
+    <div className="rounded-md border border-[#eceff1] bg-[#f8fafb] p-2.5">
+      <p className="text-[7px] font-bold uppercase tracking-wide text-muted">{label}</p>
+      <p className="mt-1.5 break-words text-[11px] font-semibold text-heading">{value}</p>
     </div>
   );
 }
@@ -400,7 +398,7 @@ function StructuredResult({ data }) {
         <div key={key} className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-sm font-bold text-slate-950">{titleize(key)}</p>
           {typeof value === "object" && value !== null ? (
-            <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-100">
+            <pre className="code-block mt-3 max-h-72">
               {JSON.stringify(value, null, 2)}
             </pre>
           ) : (

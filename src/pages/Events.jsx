@@ -123,7 +123,7 @@ export default function Events() {
         <section className="card h-fit">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-600 text-white">
+              <div className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-light text-white">
                 <CalendarDaysIcon className="h-6 w-6" />
               </div>
               <div>
@@ -171,7 +171,7 @@ export default function Events() {
                         {event.description || "No description"}
                       </p>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${statusTone(event.status)}`}>
+                    <span className={`shrink-0 ${statusTone(event.status)}`}>
                       {event.status}
                     </span>
                   </div>
@@ -247,7 +247,7 @@ export default function Events() {
                         className="max-h-[min(68vh,720px)] w-full object-contain"
                       />
                     ) : (
-                      <div className="flex aspect-[16/9] items-center justify-center bg-gradient-to-br from-slate-900 via-primary to-cyan-700 p-8 text-center text-white">
+                      <div className="flex aspect-[16/9] items-center justify-center bg-banner-gradient p-8 text-center text-white">
                         <div>
                           <PhotoIcon className="mx-auto h-12 w-12 opacity-80" />
                           <p className="mt-3 text-lg font-bold">{selectedEvent.title}</p>
