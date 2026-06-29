@@ -19,6 +19,9 @@ wireframe-*
 scripts/cf-update.json
 scripts/cloudfront-function-config.json
 scripts/waf-update.json
+scripts/waf-rules.json
+scripts/waf-default-action.json
+scripts/waf-visibility.json
 
 # Editor directories and files
 .vscode/*

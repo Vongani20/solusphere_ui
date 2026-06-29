@@ -21,7 +21,7 @@ const uploadPaths = [
 function run(command, args) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
-    shell: process.platform === "win32",
+    shell: false,
   });
 
   if (result.status !== 0) {
@@ -32,6 +32,12 @@ function run(command, args) {
   return result.stdout;
 }
 
+function writeJson(name, value) {
+  const filePath = path.join(__dirname, name);
+  fs.writeFileSync(filePath, JSON.stringify(value));
+  return filePath;
+}
+
 function uploadPathExclusionStatement() {
   return {
     NotStatement: {
@@ -39,7 +45,7 @@ function uploadPathExclusionStatement() {
         OrStatement: {
           Statements: uploadPaths.map((uploadPath) => ({
             ByteMatchStatement: {
-              SearchString: uploadPath,
+              SearchString: Buffer.from(uploadPath, "utf8").toString("base64"),
               FieldToMatch: { UriPath: {} },
               TextTransformations: [{ Priority: 0, Type: "LOWERCASE" }],
               PositionalConstraint: "STARTS_WITH",
@@ -83,19 +89,9 @@ const rules = WebACL.Rules.map((rule) => {
   };
 });
 
-const updatePayload = {
-  Name: WebACL.Name,
-  Scope: "CLOUDFRONT",
-  Id: aclId,
-  LockToken,
-  DefaultAction: WebACL.DefaultAction,
-  Description: WebACL.Description || "CloudFront WAF",
-  Rules: rules,
-  VisibilityConfig: WebACL.VisibilityConfig,
-};
-
-const payloadPath = path.join(__dirname, "waf-update.json");
-fs.writeFileSync(payloadPath, JSON.stringify(updatePayload));
+const rulesPath = writeJson("waf-rules.json", rules);
+const defaultActionPath = writeJson("waf-default-action.json", WebACL.DefaultAction);
+const visibilityPath = writeJson("waf-visibility.json", WebACL.VisibilityConfig);
 
 console.log("Updating WAF ACL to allow multipart uploads on face/CV/file endpoints...");
 
@@ -112,8 +108,14 @@ run("aws", [
   region,
   "--lock-token",
   LockToken,
-  "--cli-input-json",
-  `file://${payloadPath.replace(/\\/g, "/")}`,
+  "--default-action",
+  `file://${defaultActionPath.replace(/\\/g, "/")}`,
+  "--description",
+  WebACL.Description || "CloudFront WAF",
+  "--visibility-config",
+  `file://${visibilityPath.replace(/\\/g, "/")}`,
+  "--rules",
+  `file://${rulesPath.replace(/\\/g, "/")}`,
 ]);
 
 console.log("WAF upload exclusions applied.");
