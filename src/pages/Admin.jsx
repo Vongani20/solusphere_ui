@@ -3,6 +3,7 @@ import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
   CalendarDaysIcon,
+  ClockIcon,
   DocumentTextIcon,
   EnvelopeIcon,
   PencilSquareIcon,
@@ -45,6 +46,7 @@ const tabs = [
   { id: "users", label: "Users", icon: UserIcon },
   { id: "events", label: "Events", icon: CalendarDaysIcon },
   { id: "helpdesk", label: "Helpdesk", icon: TicketIcon },
+  { id: "login-audit", label: "Login Audit", icon: ClockIcon },
   { id: "cvs", label: "CV Management", icon: DocumentTextIcon },
 ];
 
@@ -86,6 +88,14 @@ export default function Admin() {
   const [loadingCvs, setLoadingCvs] = useState(false);
   const [selectedCv, setSelectedCv] = useState(null);
   const [downloadingCvId, setDownloadingCvId] = useState(null);
+
+  const [loginAudits, setLoginAudits] = useState([]);
+  const [loginAuditPagination, setLoginAuditPagination] = useState(null);
+  const [loadingLoginAudits, setLoadingLoginAudits] = useState(false);
+  const [loginAuditEmail, setLoginAuditEmail] = useState("");
+  const [loginAuditStatus, setLoginAuditStatus] = useState("");
+  const [loginAuditMethod, setLoginAuditMethod] = useState("");
+  const [loginAuditPage, setLoginAuditPage] = useState(1);
 
   const selectedUser = useMemo(
     () => users.find((user) => user.id === editingUserID),
@@ -159,6 +169,40 @@ export default function Admin() {
   useEffect(() => {
     if (activeTab === "cvs" && cvs.length === 0) loadCvs();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === "login-audit") loadLoginAudits();
+  }, [activeTab, loginAuditPage]);
+
+  const viewUserLoginHistory = (user) => {
+    setLoginAuditEmail(user.email || "");
+    setLoginAuditStatus("");
+    setLoginAuditMethod("");
+    setLoginAuditPage(1);
+    setActiveTab("login-audit");
+  };
+
+  const loadLoginAudits = async () => {
+    setLoadingLoginAudits(true);
+    setError("");
+    try {
+      const res = await api.get("/admin/login-audit", {
+        params: {
+          page: loginAuditPage,
+          limit: 50,
+          email: loginAuditEmail || undefined,
+          status: loginAuditStatus || undefined,
+          method: loginAuditMethod || undefined,
+        },
+      });
+      setLoginAudits(res.data.logs || []);
+      setLoginAuditPagination(res.data.pagination || null);
+    } catch (err) {
+      setError(getApiError(err, "Failed to load login audit logs."));
+    } finally {
+      setLoadingLoginAudits(false);
+    }
+  };
 
   const loadCvs = async () => {
     setLoadingCvs(true);
@@ -638,6 +682,7 @@ export default function Admin() {
                       subDetail={user.phone_number || user.auth_provider || "No phone"}
                       placeholderIcon={UserIcon}
                       onEdit={() => editUser(user)}
+                      onViewLogins={() => viewUserLoginHistory(user)}
                       onDelete={() => deleteUser(user)}
                       deleting={deletingUserID === user.id}
                       deleteDisabled={profile?.id === user.id}
@@ -811,6 +856,161 @@ export default function Admin() {
                 )}
               </div>
             </DataCard>
+          </section>
+        )}
+
+        {activeTab === "login-audit" && (
+          <section className="card space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Login Audit Trail</h2>
+                <p className="text-sm text-slate-500">
+                  Password and face login attempts across the platform
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadLoginAudits}
+                className="btn btn-secondary inline-flex items-center gap-2"
+              >
+                <ArrowPathIcon className={`h-5 w-5 ${loadingLoginAudits ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Email</span>
+                <input
+                  type="text"
+                  value={loginAuditEmail}
+                  onChange={(event) => setLoginAuditEmail(event.target.value)}
+                  className="input"
+                  placeholder="Search by email"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Status</span>
+                <select
+                  value={loginAuditStatus}
+                  onChange={(event) => {
+                    setLoginAuditStatus(event.target.value);
+                    setLoginAuditPage(1);
+                  }}
+                  className="input bg-white"
+                >
+                  <option value="">All</option>
+                  <option value="success">Success</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Method</span>
+                <select
+                  value={loginAuditMethod}
+                  onChange={(event) => {
+                    setLoginAuditMethod(event.target.value);
+                    setLoginAuditPage(1);
+                  }}
+                  className="input bg-white"
+                >
+                  <option value="">All</option>
+                  <option value="password">Password</option>
+                  <option value="face">Face</option>
+                </select>
+              </label>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginAuditPage(1);
+                    loadLoginAudits();
+                  }}
+                  className="btn btn-primary w-full"
+                >
+                  Apply filters
+                </button>
+              </div>
+            </div>
+
+            <DataCard
+              title="Login events"
+              detail={
+                loginAuditPagination
+                  ? `${loginAuditPagination.total} total records`
+                  : `${loginAudits.length} records`
+              }
+            >
+              {loginAudits.length === 0 ? (
+                <EmptyState
+                  text={loadingLoginAudits ? "Loading login audit logs..." : "No login events found."}
+                />
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {["When", "User", "Email", "Method", "Status", "IP", "Details"].map((heading) => (
+                          <th
+                            key={heading}
+                            className="whitespace-nowrap px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
+                          >
+                            {heading}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {loginAudits.map((entry) => (
+                        <tr key={entry.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                            {formatDate(entry.created_at)}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">
+                            {entry.username || (entry.user_id ? `User #${entry.user_id}` : "—")}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{entry.email || "—"}</td>
+                          <td className="px-4 py-3 text-sm text-slate-700">{titleize(entry.login_method)}</td>
+                          <td className="px-4 py-3">
+                            <span className={statusTone(entry.status)}>{entry.status}</span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                            {entry.ip_address || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">
+                            {entry.failure_reason || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </DataCard>
+
+            {loginAuditPagination && loginAuditPagination.totalPages > 1 && (
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  disabled={loginAuditPage <= 1}
+                  onClick={() => setLoginAuditPage((value) => Math.max(1, value - 1))}
+                  className="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <p className="text-sm font-semibold text-slate-600">
+                  Page {loginAuditPagination.page} of {loginAuditPagination.totalPages}
+                </p>
+                <button
+                  type="button"
+                  disabled={loginAuditPage >= loginAuditPagination.totalPages}
+                  onClick={() => setLoginAuditPage((value) => value + 1)}
+                  className="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </section>
         )}
 
@@ -1179,6 +1379,7 @@ function RecordRow({
   image,
   placeholderIcon: PlaceholderIcon = PhotoIcon,
   onEdit,
+  onViewLogins,
   onDelete,
   deleting,
   deleteDisabled = false,
@@ -1205,6 +1406,17 @@ function RecordRow({
         </div>
       </div>
       <div className="flex shrink-0 gap-2">
+        {onViewLogins && (
+          <button
+            type="button"
+            onClick={onViewLogins}
+            className="rounded-lg p-2 text-slate-600 hover:bg-primary/10 hover:text-primary"
+            aria-label="View login history"
+            title="View login history"
+          >
+            <ClockIcon className="h-5 w-5" />
+          </button>
+        )}
         <button type="button" onClick={onEdit} className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-primary" aria-label="Edit">
           <PencilSquareIcon className="h-5 w-5" />
         </button>
