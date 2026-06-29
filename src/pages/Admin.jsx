@@ -78,8 +78,11 @@ export default function Admin() {
   const [deletingTicketID, setDeletingTicketID] = useState(null);
 
   const [cvs, setCvs] = useState([]);
+  const [cvTotalCount, setCvTotalCount] = useState(0);
   const [cvSearchSkill, setCvSearchSkill] = useState("");
   const [cvSearchQualification, setCvSearchQualification] = useState("");
+  const [cvSearchQuery, setCvSearchQuery] = useState("");
+  const [cvSearchMatch, setCvSearchMatch] = useState("all");
   const [loadingCvs, setLoadingCvs] = useState(false);
   const [selectedCv, setSelectedCv] = useState(null);
   const [downloadingCvId, setDownloadingCvId] = useState(null);
@@ -107,11 +110,12 @@ export default function Admin() {
     setLoading(true);
     setError("");
 
-    const [profileRes, usersRes, eventsRes, ticketsRes] = await Promise.allSettled([
+    const [profileRes, usersRes, eventsRes, ticketsRes, cvsRes] = await Promise.allSettled([
       api.get("/profile"),
       api.get("/admin/users"),
       api.get("/events"),
       api.get("/admin/helpdesk"),
+      api.get("/admin/cvs"),
     ]);
 
     if (profileRes.status === "fulfilled") {
@@ -126,6 +130,10 @@ export default function Admin() {
     }
     if (ticketsRes.status === "fulfilled") {
       setTickets(ticketsRes.value.data.tickets || []);
+    }
+    if (cvsRes.status === "fulfilled") {
+      const allCvs = cvsRes.value.data.cvs || [];
+      setCvTotalCount(allCvs.length);
     }
 
     const failed = [profileRes, usersRes, eventsRes, ticketsRes].find((result) => result.status === "rejected");
@@ -160,9 +168,34 @@ export default function Admin() {
         params: {
           skill: cvSearchSkill || undefined,
           qualification: cvSearchQualification || undefined,
+          q: cvSearchQuery || undefined,
+          match: cvSearchMatch || "all",
         },
       });
-      setCvs(res.data.cvs || []);
+      const rows = res.data.cvs || [];
+      setCvs(rows);
+      if (!cvSearchSkill && !cvSearchQualification && !cvSearchQuery) {
+        setCvTotalCount(rows.length);
+      }
+    } catch (err) {
+      showError(err, "Failed to load CVs.");
+    } finally {
+      setLoadingCvs(false);
+    }
+  };
+
+  const clearCvSearch = async () => {
+    setCvSearchSkill("");
+    setCvSearchQualification("");
+    setCvSearchQuery("");
+    setCvSearchMatch("all");
+    setLoadingCvs(true);
+    setError("");
+    try {
+      const res = await api.get("/admin/cvs");
+      const rows = res.data.cvs || [];
+      setCvs(rows);
+      setCvTotalCount(rows.length);
     } catch (err) {
       showError(err, "Failed to load CVs.");
     } finally {
@@ -508,7 +541,7 @@ export default function Admin() {
             <SummaryTile label="Users" value={users.length} />
             <SummaryTile label="Events" value={events.length} />
             <SummaryTile label="Tickets" value={tickets.length} />
-            <SummaryTile label="CVs" value={cvs.length} />
+            <SummaryTile label="CVs" value={cvTotalCount} />
           </div>
         </section>
 
@@ -794,14 +827,14 @@ export default function Admin() {
                   <p className="text-sm text-slate-500">Search and download candidate CVs</p>
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <label className="block">
                   <span className="mb-2 block text-sm font-semibold text-slate-700">Skill</span>
                   <input
                     className="input"
                     value={cvSearchSkill}
                     onChange={(e) => setCvSearchSkill(e.target.value)}
-                    placeholder="e.g. Python"
+                    placeholder="e.g. Python, SQL"
                     onKeyDown={(e) => e.key === "Enter" && loadCvs()}
                   />
                 </label>
@@ -811,28 +844,63 @@ export default function Admin() {
                     className="input"
                     value={cvSearchQualification}
                     onChange={(e) => setCvSearchQualification(e.target.value)}
-                    placeholder="e.g. BSc"
+                    placeholder="e.g. BSc, MBA"
                     onKeyDown={(e) => e.key === "Enter" && loadCvs()}
                   />
                 </label>
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={loadCvs}
-                    disabled={loadingCvs}
-                    className="btn btn-primary inline-flex w-full items-center justify-center gap-2 disabled:opacity-50"
+                <label className="block sm:col-span-2 lg:col-span-1">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Keyword</span>
+                  <input
+                    className="input"
+                    value={cvSearchQuery}
+                    onChange={(e) => setCvSearchQuery(e.target.value)}
+                    placeholder="Name, role, experience…"
+                    onKeyDown={(e) => e.key === "Enter" && loadCvs()}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Match mode</span>
+                  <select
+                    className="input"
+                    value={cvSearchMatch}
+                    onChange={(e) => setCvSearchMatch(e.target.value)}
                   >
-                    <ArrowPathIcon className={`h-4 w-4 ${loadingCvs ? "animate-spin" : ""}`} />
-                    {loadingCvs ? "Searching…" : "Search"}
-                  </button>
-                </div>
+                    <option value="all">Match all filters</option>
+                    <option value="any">Match any filter</option>
+                  </select>
+                </label>
+              </div>
+              <p className="mt-3 text-xs text-slate-500">
+                Advanced search scans skills, qualifications, computer skills, languages, experience, profile text, and names.
+                Use &quot;Match any&quot; if a strict skill + qualification search returns no results.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={loadCvs}
+                  disabled={loadingCvs}
+                  className="btn btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <ArrowPathIcon className={`h-4 w-4 ${loadingCvs ? "animate-spin" : ""}`} />
+                  {loadingCvs ? "Searching…" : "Search"}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearCvSearch}
+                  className="btn btn-secondary"
+                >
+                  Clear &amp; show all
+                </button>
               </div>
             </div>
 
             {/* CV list */}
             <div className="card">
               <div className="mb-4 flex items-center justify-between">
-                <p className="text-sm text-slate-500">{cvs.length} CV{cvs.length !== 1 ? "s" : ""} found</p>
+                <p className="text-sm text-slate-500">
+                  {cvs.length} CV{cvs.length !== 1 ? "s" : ""} found
+                  {cvTotalCount > 0 && cvs.length !== cvTotalCount ? ` (${cvTotalCount} total in directory)` : ""}
+                </p>
                 <button
                   type="button"
                   onClick={loadCvs}
@@ -843,7 +911,15 @@ export default function Admin() {
                 </button>
               </div>
               {cvs.length === 0 ? (
-                <EmptyState text={loadingCvs ? "Loading CVs…" : "No CVs found"} />
+                <EmptyState
+                  text={
+                    loadingCvs
+                      ? "Loading CVs…"
+                      : cvTotalCount === 0
+                        ? "No completed CVs in the directory yet."
+                        : "No CVs matched these filters. Try Match any, fewer keywords, or Clear & show all."
+                  }
+                />
               ) : (
                 <div className="overflow-hidden rounded-lg border border-slate-200">
                   <table className="min-w-full divide-y divide-slate-200">
