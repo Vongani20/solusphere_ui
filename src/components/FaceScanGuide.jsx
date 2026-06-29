@@ -5,6 +5,7 @@ export default function FaceScanGuide({
   imageUrl,
   cameraActive = true,
   status = "Center your face inside the ring",
+  videoTransform = { x: 0, y: 0, scale: 1.45 },
   primaryLabel,
   onPrimary,
   secondaryLabel,
@@ -15,6 +16,7 @@ export default function FaceScanGuide({
   compact = false,
 }) {
   const ringSize = compact ? "h-48 w-48" : "h-[200px] w-[200px]";
+  const displayStatus = status;
 
   return (
     <div className={compact ? "w-full" : "mx-auto w-full max-w-sm"}>
@@ -24,7 +26,22 @@ export default function FaceScanGuide({
         {imageUrl ? (
           <img src={imageUrl} alt="Face scan" className="h-full w-full object-cover" />
         ) : cameraActive ? (
-          <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+          <div
+            className="h-full w-full will-change-transform"
+            style={{
+              transform: `translate(${videoTransform.x}px, ${videoTransform.y}px) scale(${videoTransform.scale})`,
+              transition: "transform 80ms linear",
+            }}
+          >
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              className="h-full w-full object-cover"
+              style={{ transform: "scaleX(-1)" }}
+            />
+          </div>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-center font-mono text-[11px] text-muted">
             live camera
@@ -35,7 +52,7 @@ export default function FaceScanGuide({
       </div>
 
       {!compact && (
-        <p className="mt-4 text-center text-[11px] font-medium text-label">{status}</p>
+        <p className="mt-4 text-center text-[11px] font-medium text-label">{displayStatus}</p>
       )}
 
       {(primaryLabel || secondaryLabel || cancelLabel) && (

@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FaceScanGuide from "../components/FaceScanGuide";
 import AuthLayout, { AuthAlert } from "../components/AuthLayout";
+import useFaceFollowCamera from "../hooks/useFaceFollowCamera";
 import api, { clearSession, getApiError, saveSession } from "../services/api";
 import { getCameraErrorMessage, requestUserCamera } from "../utils/camera";
+import { canvasToJpegBlob, captureFollowedFace } from "../utils/faceCapture";
 
 export default function FaceLogin() {
   const [capturedImage, setCapturedImage] = useState(null);
@@ -12,6 +14,8 @@ export default function FaceLogin() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const navigate = useNavigate();
+  const cameraActive = !capturedImage;
+  const { transform, tracking } = useFaceFollowCamera(videoRef, cameraActive);
 
   useEffect(() => {
     clearSession();
@@ -41,29 +45,30 @@ export default function FaceLogin() {
     };
   }, [capturedImage]);
 
-  const captureFace = () => {
+  const captureFace = async () => {
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
+    if (!video) return;
 
     if (video.videoWidth === 0 || video.videoHeight === 0) {
       setError("Camera is not ready yet.");
       return;
     }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    const canvas = captureFollowedFace(video, transform) || canvasRef.current;
+    if (!canvas) {
+      setError("Failed to capture image.");
+      return;
+    }
 
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        setError("Failed to capture image.");
-        return;
-      }
-      if (capturedImage?.url) URL.revokeObjectURL(capturedImage.url);
-      setCapturedImage({ blob, url: URL.createObjectURL(blob) });
-      setError("");
-    }, "image/jpeg", 0.92);
+    const blob = await canvasToJpegBlob(canvas);
+    if (!blob) {
+      setError("Failed to capture image.");
+      return;
+    }
+
+    if (capturedImage?.url) URL.revokeObjectURL(capturedImage.url);
+    setCapturedImage({ blob, url: URL.createObjectURL(blob) });
+    setError("");
   };
 
   const handleFaceLogin = async () => {
@@ -100,8 +105,9 @@ export default function FaceLogin() {
       <FaceScanGuide
         videoRef={videoRef}
         imageUrl={capturedImage?.url}
-        cameraActive={!capturedImage}
-        status="Center your face inside the ring"
+        cameraActive={cameraActive}
+        videoTransform={transform}
+        status={tracking.message}
         primaryLabel={capturedImage ? (loading ? "Authenticating..." : "Use this face") : "Start Face Scan"}
         onPrimary={capturedImage ? handleFaceLogin : captureFace}
         secondaryLabel="password login"
