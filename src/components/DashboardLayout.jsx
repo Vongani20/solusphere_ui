@@ -29,7 +29,7 @@ const navigation = [
   { name: "SIA Chat", href: "/chatbot", icon: ChatBubbleLeftRightIcon },
   { name: "BPO Analysis", href: "/bpo", icon: DocumentChartBarIcon },
   { name: "CV Builder", href: "/cv-builder", icon: DocumentTextIcon },
-  { name: "Uploads", href: "/uploads", icon: CloudArrowUpIcon },
+  // { name: "Uploads", href: "/uploads", icon: CloudArrowUpIcon },
   { name: "Admin", href: "/admin", icon: ShieldCheckIcon, adminOnly: true },
 ];
 
