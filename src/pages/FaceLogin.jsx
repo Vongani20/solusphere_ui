@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FaceScanGuide from "../components/FaceScanGuide";
 import AuthLayout, { AuthAlert } from "../components/AuthLayout";
-import api, { getApiError, saveSession } from "../services/api";
+import api, { clearSession, getApiError, saveSession } from "../services/api";
 import { getCameraErrorMessage, requestUserCamera } from "../utils/camera";
 
 export default function FaceLogin() {
@@ -12,6 +12,10 @@ export default function FaceLogin() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    clearSession();
+  }, []);
 
   useEffect(() => {
     let stream;

@@ -5,6 +5,22 @@ export const API_BASE_URL =
 
 export const ROOT_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
+const PUBLIC_API_PATHS = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/face-login",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/outlook365/signup",
+];
+
+function isPublicApiPath(url = "") {
+  const path = url.replace(/^https?:\/\/[^/]+/i, "").split("?")[0];
+  return PUBLIC_API_PATHS.some(
+    (publicPath) => path === publicPath || path.endsWith(publicPath)
+  );
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
@@ -43,15 +59,27 @@ export function getApiError(error, fallback = "Something went wrong.") {
     return "Network error — could not reach the server. Check your connection and try again.";
   }
 
+  const status = error?.response?.status;
+  if (status === 403) {
+    return "Upload blocked by the server (403). Try password login, hard-refresh, or contact support if this continues.";
+  }
+
   const data = error?.response?.data;
-  const candidate =
+  let candidate =
     data?.error ||
     data?.message ||
-    (typeof data?.details === "string" ? data.details : null) ||
-    error?.message;
+    (typeof data?.details === "string" ? data.details : null);
+
+  if (!candidate && typeof data === "string" && data.trim()) {
+    candidate = data;
+  }
 
   if (typeof candidate === "string" && candidate.trim()) {
     return candidate;
+  }
+
+  if (status) {
+    return `${fallback} (HTTP ${status})`;
   }
 
   return fallback;
@@ -60,8 +88,11 @@ export function getApiError(error, fallback = "Something went wrong.") {
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
-    if (token) {
+    if (token && !isPublicApiPath(config.url || "")) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else if (config.headers) {
+      delete config.headers.Authorization;
+      delete config.headers.authorization;
     }
 
     if (config.data instanceof FormData) {

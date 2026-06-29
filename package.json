@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "deploy": "node scripts/deploy.mjs",
     "deploy:s3": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-s3.ps1",
-    "configure:cloudfront": "node scripts/configure-cloudfront-spa.mjs"
+    "configure:cloudfront": "node scripts/configure-cloudfront-spa.mjs",
+    "configure:waf": "node scripts/configure-waf-uploads.mjs"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
