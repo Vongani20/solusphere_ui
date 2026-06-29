@@ -51,6 +51,26 @@ function prepareSdpForSignaling(sdp) {
   return `${lines.join("\r\n")}\r\n`;
 }
 
+function waitForIceGathering(pc, timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    if (pc.iceGatheringState === "complete") {
+      resolve();
+      return;
+    }
+
+    const timer = window.setTimeout(resolve, timeoutMs);
+    const onStateChange = () => {
+      if (pc.iceGatheringState === "complete") {
+        window.clearTimeout(timer);
+        pc.removeEventListener("icegatheringstatechange", onStateChange);
+        resolve();
+      }
+    };
+
+    pc.addEventListener("icegatheringstatechange", onStateChange);
+  });
+}
+
 function peerLabel(call, currentUserId) {
   if (!call) return "User";
   if (call.caller_id === currentUserId) return call.callee_username || "User";
@@ -449,6 +469,7 @@ export function CallProvider({ children }) {
   const incomingTimerRef = useRef(null);
   const remoteDescriptionSetRef = useRef(false);
   const pendingRemoteCandidatesRef = useRef([]);
+  const pendingLocalCandidatesRef = useRef([]);
   const localStreamRef = useRef(null);
 
   const [callSession, setCallSession] = useState(null);
@@ -481,6 +502,7 @@ export function CallProvider({ children }) {
     candidateSinceRef.current = 0;
     remoteDescriptionSetRef.current = false;
     pendingRemoteCandidatesRef.current = [];
+    pendingLocalCandidatesRef.current = [];
   }, [stopPolling]);
 
   const cleanupMedia = useCallback(() => {
@@ -517,11 +539,30 @@ export function CallProvider({ children }) {
     });
   }, []);
 
+  const flushLocalCandidates = useCallback(async () => {
+    const callId = callIdRef.current;
+    if (!callId) return;
+
+    const pending = pendingLocalCandidatesRef.current.splice(0);
+    for (const candidate of pending) {
+      try {
+        await postIceCandidate(callId, candidate);
+      } catch {
+        // Ignore transient candidate upload failures.
+      }
+    }
+  }, [postIceCandidate]);
+
   const attachPeerHandlers = useCallback(
     (pc) => {
       pc.onicecandidate = (event) => {
-        if (!event.candidate || !callIdRef.current) return;
-        postIceCandidate(callIdRef.current, event.candidate).catch(() => {});
+        if (!event.candidate) return;
+        const callId = callIdRef.current;
+        if (!callId) {
+          pendingLocalCandidatesRef.current.push(event.candidate);
+          return;
+        }
+        postIceCandidate(callId, event.candidate).catch(() => {});
       };
 
       pc.ontrack = (event) => {
@@ -530,16 +571,23 @@ export function CallProvider({ children }) {
         setCallPhase((phase) => (phase === "connecting" || phase === "outgoing" ? "active" : phase));
       };
 
+      pc.oniceconnectionstatechange = () => {
+        const state = pc.iceConnectionState;
+        if (state === "connected" || state === "completed") {
+          setCallPhase("active");
+          setCallError("");
+        } else if (state === "failed" && remoteDescriptionSetRef.current) {
+          setCallError("Call connection failed. Check your network and try again.");
+          setCallPhase("ended");
+          stopPolling();
+        }
+      };
+
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
         if (state === "connected") {
           setCallPhase("active");
-          return;
-        }
-        if (state === "failed" && remoteDescriptionSetRef.current) {
-          setCallError("Call connection failed. Check your network and try again.");
-          setCallPhase("ended");
-          stopPolling();
+          setCallError("");
         }
       };
     },
@@ -607,7 +655,8 @@ export function CallProvider({ children }) {
   const startPolling = useCallback(
     (callId, role) => {
       stopPolling();
-      pollTimerRef.current = window.setInterval(async () => {
+
+      const poll = async () => {
         try {
           await ingestCandidates();
           const res = await api.get(`/chats/calls/${callId}`, {
@@ -639,7 +688,10 @@ export function CallProvider({ children }) {
         } catch {
           // Ignore transient polling errors.
         }
-      }, 800);
+      };
+
+      poll();
+      pollTimerRef.current = window.setInterval(poll, 500);
     },
     [ingestCandidates, setRemoteDescription, stopPolling]
   );
@@ -677,6 +729,7 @@ export function CallProvider({ children }) {
 
         const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: type === "video" });
         await pc.setLocalDescription(offer);
+        await waitForIceGathering(pc);
         const offerSdp = prepareSdpForSignaling(pc.localDescription?.sdp || offer.sdp);
 
         const res = await api.post(`/chats/${peerUserId}/calls`, {
@@ -686,6 +739,7 @@ export function CallProvider({ children }) {
 
         const call = res.data.call;
         callIdRef.current = call.id;
+        await flushLocalCandidates();
 
         setCallSession(call);
         setCallPhase("outgoing");
@@ -699,7 +753,7 @@ export function CallProvider({ children }) {
         setBusy(false);
       }
     },
-    [attachPeerHandlers, callPhase, cleanupMedia, getMedia, resetPeerState, startPolling]
+    [attachPeerHandlers, callPhase, cleanupMedia, flushLocalCandidates, getMedia, resetPeerState, startPolling]
   );
 
   const acceptCall = useCallback(async () => {
@@ -752,11 +806,14 @@ export function CallProvider({ children }) {
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
+      await waitForIceGathering(pc);
       const answerSdp = prepareSdpForSignaling(pc.localDescription?.sdp || answer.sdp);
 
       const res = await api.post(`/chats/calls/${callId}/accept`, {
         answer: { type: answer.type, sdp: answerSdp },
       });
+
+      await flushLocalCandidates();
 
       setCallSession(res.data.call);
       setCallPhase("active");
@@ -773,6 +830,7 @@ export function CallProvider({ children }) {
     attachPeerHandlers,
     callSession,
     cleanupMedia,
+    flushLocalCandidates,
     flushPendingRemoteCandidates,
     getMedia,
     resetPeerState,
