@@ -31,6 +31,7 @@ export default function BPOAnalysis() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [reprocessingId, setReprocessingId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [consentOpen, setConsentOpen] = useState(false);
@@ -156,6 +157,24 @@ export default function BPOAnalysis() {
       await loadAnalyses();
     } catch (err) {
       setError(getApiError(err, "Failed to delete analysis."));
+    }
+  };
+
+  const reprocessAnalysis = async (id) => {
+    setReprocessingId(id);
+    setError("");
+    setMessage("");
+
+    try {
+      const res = await api.post(`/bpo/analysis/${id}/reprocess`);
+      setMessage(res.data.message || "Analysis reprocessing started.");
+      const detail = await api.get(`/bpo/analysis/${id}`);
+      setSelected(detail.data.analysis);
+      await loadAnalyses();
+    } catch (err) {
+      setError(getApiError(err, "Failed to reprocess analysis."));
+    } finally {
+      setReprocessingId("");
     }
   };
 
@@ -341,9 +360,22 @@ export default function BPOAnalysis() {
               </p>
             </div>
             {selected && (
-              <span className={statusTone(selected.status)}>
-                {selected.status}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {["pending", "failed"].includes(selected.status) && (
+                  <button
+                    type="button"
+                    onClick={() => reprocessAnalysis(selected.id)}
+                    disabled={reprocessingId === selected.id}
+                    className="btn btn-secondary inline-flex items-center gap-2"
+                  >
+                    <ArrowPathIcon className={`h-4 w-4 ${reprocessingId === selected.id ? "animate-spin" : ""}`} />
+                    {reprocessingId === selected.id ? "Retrying..." : "Retry analysis"}
+                  </button>
+                )}
+                <span className={statusTone(selected.status)}>
+                  {selected.status}
+                </span>
+              </div>
             )}
           </div>
 
