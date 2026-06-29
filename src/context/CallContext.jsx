@@ -89,6 +89,8 @@ function callStatusText(callPhase, callType, label) {
       return `Calling ${label}...`;
     case "connecting":
       return `Connecting to ${label}...`;
+    case "preparing":
+      return `Starting ${kind.toLowerCase()} call...`;
     case "active":
       return `${kind} call with ${label}`;
     case "ended":
@@ -113,7 +115,7 @@ function CallStatusBanner({
   const label = peerLabel(callSession, currentUser?.id);
   const statusText = callStatusText(callPhase, callType, label);
   const isIncoming = callPhase === "incoming";
-  const isOutgoing = callPhase === "outgoing" || callPhase === "connecting";
+  const isOutgoing = callPhase === "outgoing" || callPhase === "connecting" || callPhase === "preparing";
 
   return (
     <div
@@ -242,6 +244,23 @@ function useIncomingCallAlerts(callPhase, callSession) {
   }, [callPhase, callSession]);
 }
 
+function CallErrorBanner({ message, onDismiss }) {
+  if (!message) return null;
+  return (
+    <div className="fixed bottom-4 left-1/2 z-[110] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 shadow-xl">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-rose-900">Call failed</p>
+          <p className="mt-1 text-sm text-rose-800">{message}</p>
+        </div>
+        <button type="button" onClick={onDismiss} className="rounded-md px-2 py-1 text-sm font-bold text-rose-700 hover:bg-rose-100">
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CallOverlay({
   callSession,
   callPhase,
@@ -276,7 +295,8 @@ function CallOverlay({
   const isVideo = callType === "video";
   const showActiveMedia = callPhase === "active" || callPhase === "connecting";
   const isIncoming = callPhase === "incoming";
-  const statusText = callStatusText(callPhase, callType, label);
+  const isPreparing = callPhase === "preparing";
+  const statusText = callStatusText(callPhase, callType, label || "User");
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md">
@@ -308,10 +328,21 @@ function CallOverlay({
               <UserAvatar user={peerUser} className="relative h-24 w-24 text-2xl ring-4 ring-white/20" iconClassName="h-12 w-12" />
             </div>
             <p className={`mb-2 text-xs font-bold uppercase tracking-[0.2em] ${isIncoming ? "text-emerald-300" : "text-slate-400"}`}>
-              {isIncoming ? "Incoming call" : callPhase === "outgoing" ? "Outgoing call" : "Live call"}
+              {isIncoming
+                ? "Incoming call"
+                : isPreparing
+                  ? "Starting call"
+                  : callPhase === "outgoing"
+                    ? "Outgoing call"
+                    : callPhase === "ended"
+                      ? "Call ended"
+                      : "Live call"}
             </p>
-            <h2 className="text-3xl font-bold">{label}</h2>
+            <h2 className="text-3xl font-bold">{label || "Contact"}</h2>
             <p className="mt-3 text-base text-slate-200">{statusText}</p>
+            {callPhase === "preparing" ? (
+              <p className="mt-2 text-sm text-slate-400">Allow microphone access to continue...</p>
+            ) : null}
             {!isVideo && showActiveMedia ? (
               <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
             ) : null}
@@ -348,7 +379,7 @@ function CallOverlay({
             </>
           ) : null}
 
-          {callPhase === "outgoing" || callPhase === "connecting" || callPhase === "active" ? (
+          {callPhase === "outgoing" || callPhase === "connecting" || callPhase === "active" || isPreparing ? (
             <button
               type="button"
               onClick={onEnd}
@@ -581,10 +612,11 @@ export function CallProvider({ children }) {
 
   const startCall = useCallback(
     async (peerUserId, type = "audio") => {
-      if (!peerUserId || callPhase !== "idle") return;
+      if (!peerUserId || (callPhase !== "idle" && callPhase !== "ended")) return;
       setBusy(true);
       setCallError("");
       setCallType(type);
+      setCallPhase("preparing");
       resetPeerState();
 
       try {
@@ -613,7 +645,7 @@ export function CallProvider({ children }) {
       } catch (err) {
         cleanupMedia();
         setCallError(getApiError(err, "Failed to start call."));
-        setCallPhase("idle");
+        setCallPhase("ended");
       } finally {
         setBusy(false);
       }
@@ -700,7 +732,8 @@ export function CallProvider({ children }) {
   }, [callPhase, callSession, resetCall]);
 
   useEffect(() => {
-    if (callPhase !== "idle" || !localStorage.getItem("token")) return undefined;
+    if (!localStorage.getItem("token")) return undefined;
+    if (callPhase !== "idle" && callPhase !== "ended") return undefined;
 
     const pollIncoming = async () => {
       try {
@@ -730,7 +763,17 @@ export function CallProvider({ children }) {
     };
   }, [callPhase]);
 
-  useEffect(() => () => cleanupMedia(), [cleanupMedia]);
+  useEffect(() => {
+    return () => {
+      stopPolling();
+      if (incomingTimerRef.current) {
+        window.clearInterval(incomingTimerRef.current);
+        incomingTimerRef.current = null;
+      }
+      localStreamRef.current?.getTracks().forEach((track) => track.stop());
+      pcRef.current?.close();
+    };
+  }, [stopPolling]);
 
   useIncomingCallAlerts(callPhase, callSession);
 
@@ -752,6 +795,7 @@ export function CallProvider({ children }) {
   return (
     <CallContext.Provider value={value}>
       {children}
+      <CallErrorBanner message={callError} onDismiss={() => setCallError("")} />
       <CallStatusBanner
         callSession={callSession}
         callPhase={callPhase}
