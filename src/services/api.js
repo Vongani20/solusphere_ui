@@ -65,10 +65,17 @@ export function getApiError(error, fallback = "Something went wrong.") {
   }
 
   const data = error?.response?.data;
+  const errorText = typeof data?.error === "string" ? data.error.trim() : "";
+  const detailsText = typeof data?.details === "string" ? data.details.trim() : "";
+
+  if (errorText && detailsText && errorText !== detailsText) {
+    return `${errorText}: ${detailsText}`;
+  }
+
   let candidate =
-    data?.error ||
+    errorText ||
     data?.message ||
-    (typeof data?.details === "string" ? data.details : null);
+    detailsText;
 
   if (!candidate && typeof data === "string" && data.trim()) {
     candidate = data;

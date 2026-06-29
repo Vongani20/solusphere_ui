@@ -78,35 +78,61 @@ const FORM_STRING_FIELDS = [
 const FACE_REQUIRED_MESSAGE =
   "Register your face in Profile before using the CV Builder.";
 
-const cleanStringList = (items) => {
-  const cleaned = (items ?? []).map((item) => String(item).trim()).filter(Boolean);
-  return cleaned.length ? cleaned : [""];
+const cleanStringList = (items) =>
+  (items ?? []).map((item) => String(item).trim()).filter(Boolean);
+
+const normalizeDateOfBirth = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return raw;
 };
 
-const prepareFormForSave = (form) => ({
-  first_name: form.first_name.trim(),
-  last_name: form.last_name.trim(),
-  profile_text: form.profile_text.trim(),
-  value_proposition: form.value_proposition.trim(),
-  gender: form.gender,
-  nationality: form.nationality.trim(),
-  date_of_birth: form.date_of_birth,
-  professional_skills: form.professional_skills.map((skill) => ({
-    skill: String(skill.skill ?? "").trim(),
-    details: cleanStringList(skill.details),
-  })),
-  qualifications: cleanStringList(form.qualifications),
-  computer_skills: cleanStringList(form.computer_skills),
-  professional_memberships: cleanStringList(form.professional_memberships),
-  languages: cleanStringList(form.languages),
-  experience: form.experience.map((exp) => ({
-    company: String(exp.company ?? "").trim(),
-    position: String(exp.position ?? "").trim(),
-    period_start: String(exp.period_start ?? "").trim(),
-    period_end: String(exp.period_end ?? "").trim(),
-    scope_of_work: cleanStringList(exp.scope_of_work),
-  })),
-});
+const prepareFormForSave = (form) => {
+  const professional_skills = form.professional_skills
+    .map((skill) => ({
+      skill: String(skill.skill ?? "").trim(),
+      details: cleanStringList(skill.details),
+    }))
+    .filter((skill) => skill.skill || skill.details.length > 0);
+
+  const experience = form.experience
+    .map((exp) => ({
+      company: String(exp.company ?? "").trim(),
+      position: String(exp.position ?? "").trim(),
+      period_start: String(exp.period_start ?? "").trim(),
+      period_end: String(exp.period_end ?? "").trim(),
+      scope_of_work: cleanStringList(exp.scope_of_work),
+    }))
+    .filter(
+      (exp) =>
+        exp.company ||
+        exp.position ||
+        exp.period_start ||
+        exp.period_end ||
+        exp.scope_of_work.length > 0
+    );
+
+  return {
+    first_name: form.first_name.trim(),
+    last_name: form.last_name.trim(),
+    profile_text: form.profile_text.trim(),
+    value_proposition: form.value_proposition.trim(),
+    gender: String(form.gender ?? "").trim(),
+    nationality: form.nationality.trim(),
+    date_of_birth: normalizeDateOfBirth(form.date_of_birth),
+    professional_skills,
+    qualifications: cleanStringList(form.qualifications),
+    computer_skills: cleanStringList(form.computer_skills),
+    professional_memberships: cleanStringList(form.professional_memberships),
+    languages: cleanStringList(form.languages),
+    experience,
+  };
+};
 
 const cvApiError = (err, fallback) => {
   if (err?.response?.status === 428) {
@@ -279,10 +305,15 @@ export default function CVBuilder() {
     try {
       const payload = prepareFormForSave(form);
       const res = await api.post("/cv", payload);
-      setForm(normalizeCv({ ...form, ...(res.data?.cv || {}) }));
+      if (res.data?.cv) {
+        setForm(normalizeCv(res.data.cv));
+      } else {
+        setForm(normalizeCv({ ...form, ...payload }));
+        if (res.data?.message) setMessage(res.data.message);
+      }
       if (nextStep) {
         setStep(nextStep);
-      } else {
+      } else if (res.data?.cv || !res.data?.message) {
         setMessage("CV saved successfully.");
       }
     } catch (err) {
