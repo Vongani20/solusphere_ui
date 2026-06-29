@@ -80,6 +80,168 @@ function MediaTile({ stream, muted = false, label, className = "" }) {
   );
 }
 
+function callStatusText(callPhase, callType, label) {
+  const kind = callType === "video" ? "Video" : "Voice";
+  switch (callPhase) {
+    case "incoming":
+      return `Incoming ${kind.toLowerCase()} call from ${label}`;
+    case "outgoing":
+      return `Calling ${label}...`;
+    case "connecting":
+      return `Connecting to ${label}...`;
+    case "active":
+      return `${kind} call with ${label}`;
+    case "ended":
+      return `Call with ${label} ended`;
+    default:
+      return "";
+  }
+}
+
+function CallStatusBanner({
+  callSession,
+  callPhase,
+  callType,
+  onAccept,
+  onReject,
+  onEnd,
+  busy,
+}) {
+  const currentUser = getStoredUser();
+  if (callPhase === "idle" || callPhase === "ended") return null;
+
+  const label = peerLabel(callSession, currentUser?.id);
+  const statusText = callStatusText(callPhase, callType, label);
+  const isIncoming = callPhase === "incoming";
+  const isOutgoing = callPhase === "outgoing" || callPhase === "connecting";
+
+  return (
+    <div
+      className={`fixed left-0 right-0 top-0 z-[95] border-b px-4 py-3 shadow-lg ${
+        isIncoming
+          ? "animate-pulse border-emerald-400 bg-emerald-600 text-white"
+          : isOutgoing
+            ? "border-sky-400 bg-sky-600 text-white"
+            : "border-primary bg-primary text-white"
+      }`}
+    >
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="relative flex h-3 w-3 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-white" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold">{statusText}</p>
+            <p className="truncate text-xs opacity-90">
+              {isIncoming ? "Tap Accept to answer" : isOutgoing ? "Waiting for answer..." : "Call in progress"}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {isIncoming ? (
+            <>
+              <button type="button" onClick={onReject} disabled={busy} className="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-bold hover:bg-white/25 disabled:opacity-50">
+                Decline
+              </button>
+              <button type="button" onClick={onAccept} disabled={busy} className="rounded-lg bg-white px-3 py-1.5 text-sm font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+                Accept
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={onEnd} className="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-bold hover:bg-white/25">
+              {isOutgoing ? "Cancel" : "End call"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useIncomingCallAlerts(callPhase, callSession) {
+  const ringtoneRef = useRef({ interval: null, ctx: null });
+
+  useEffect(() => {
+    if (callPhase !== "incoming" || !callSession) return undefined;
+
+    const currentUser = getStoredUser();
+    const label = peerLabel(callSession, currentUser?.id);
+    const originalTitle = document.title;
+    let showAlert = true;
+
+    const titleTimer = window.setInterval(() => {
+      document.title = showAlert ? `Incoming call - ${label}` : originalTitle;
+      showAlert = !showAlert;
+    }, 1000);
+
+    if (typeof Notification !== "undefined") {
+      if (Notification.permission === "granted") {
+        new Notification(`Incoming call from ${label}`, {
+          body: callSession.call_type === "video" ? "Video call" : "Voice call",
+          tag: `call-${callSession.id}`,
+          requireInteraction: true,
+        });
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            new Notification(`Incoming call from ${label}`, {
+              body: callSession.call_type === "video" ? "Video call" : "Voice call",
+              tag: `call-${callSession.id}`,
+              requireInteraction: true,
+            });
+          }
+        });
+      }
+    }
+
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        const ctx = new AudioContext();
+        ringtoneRef.current.ctx = ctx;
+
+        const playTone = (frequency, durationMs) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.value = frequency;
+          gain.gain.value = 0.12;
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          window.setTimeout(() => {
+            osc.stop();
+            osc.disconnect();
+            gain.disconnect();
+          }, durationMs);
+        };
+
+        const playRing = () => {
+          playTone(880, 180);
+          window.setTimeout(() => playTone(660, 180), 220);
+        };
+
+        playRing();
+        ringtoneRef.current.interval = window.setInterval(playRing, 2200);
+      }
+    } catch {
+      // Ignore browsers that block audio.
+    }
+
+    return () => {
+      window.clearInterval(titleTimer);
+      document.title = originalTitle;
+      if (ringtoneRef.current.interval) {
+        window.clearInterval(ringtoneRef.current.interval);
+        ringtoneRef.current.interval = null;
+      }
+      ringtoneRef.current.ctx?.close?.();
+      ringtoneRef.current.ctx = null;
+    };
+  }, [callPhase, callSession]);
+}
+
 function CallOverlay({
   callSession,
   callPhase,
@@ -113,10 +275,16 @@ function CallOverlay({
 
   const isVideo = callType === "video";
   const showActiveMedia = callPhase === "active" || callPhase === "connecting";
+  const isIncoming = callPhase === "incoming";
+  const statusText = callStatusText(callPhase, callType, label);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md">
+      <div
+        className={`w-full max-w-lg overflow-hidden rounded-3xl border shadow-2xl ${
+          isIncoming ? "border-emerald-400 bg-gradient-to-b from-emerald-950 to-slate-950" : "border-slate-700 bg-slate-950"
+        }`}
+      >
         {showActiveMedia && isVideo ? (
           <div className="relative aspect-video w-full bg-black">
             <MediaTile stream={remoteStream} label={`${label} camera off`} className="h-full w-full" />
@@ -128,16 +296,22 @@ function CallOverlay({
             />
           </div>
         ) : (
-          <div className="flex flex-col items-center px-8 pb-8 pt-10 text-center text-white">
-            <UserAvatar user={peerUser} className="mb-4 h-20 w-20 text-2xl" iconClassName="h-10 w-10" />
-            <h2 className="text-2xl font-bold">{label}</h2>
-            <p className="mt-2 text-sm text-slate-300">
-              {callPhase === "incoming" && `Incoming ${isVideo ? "video" : "voice"} call`}
-              {callPhase === "outgoing" && "Calling..."}
-              {callPhase === "connecting" && "Connecting..."}
-              {callPhase === "active" && `${isVideo ? "Video" : "Voice"} call in progress`}
-              {callPhase === "ended" && "Call ended"}
+          <div className="flex flex-col items-center px-8 pb-8 pt-12 text-center text-white">
+            <div className="relative mb-6">
+              {isIncoming ? (
+                <>
+                  <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
+                  <span className="absolute -inset-3 animate-pulse rounded-full border-2 border-emerald-400/50" />
+                  <span className="absolute -inset-6 animate-pulse rounded-full border border-emerald-400/30 [animation-delay:300ms]" />
+                </>
+              ) : null}
+              <UserAvatar user={peerUser} className="relative h-24 w-24 text-2xl ring-4 ring-white/20" iconClassName="h-12 w-12" />
+            </div>
+            <p className={`mb-2 text-xs font-bold uppercase tracking-[0.2em] ${isIncoming ? "text-emerald-300" : "text-slate-400"}`}>
+              {isIncoming ? "Incoming call" : callPhase === "outgoing" ? "Outgoing call" : "Live call"}
             </p>
+            <h2 className="text-3xl font-bold">{label}</h2>
+            <p className="mt-3 text-base text-slate-200">{statusText}</p>
             {!isVideo && showActiveMedia ? (
               <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
             ) : null}
@@ -558,6 +732,8 @@ export function CallProvider({ children }) {
 
   useEffect(() => () => cleanupMedia(), [cleanupMedia]);
 
+  useIncomingCallAlerts(callPhase, callSession);
+
   const value = {
     callSession,
     callPhase,
@@ -576,6 +752,15 @@ export function CallProvider({ children }) {
   return (
     <CallContext.Provider value={value}>
       {children}
+      <CallStatusBanner
+        callSession={callSession}
+        callPhase={callPhase}
+        callType={callType}
+        onAccept={acceptCall}
+        onReject={rejectCall}
+        onEnd={endCall}
+        busy={busy}
+      />
       <CallOverlay
         callSession={callSession}
         callPhase={callPhase}

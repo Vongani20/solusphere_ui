@@ -17,6 +17,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import api, { clearSession, getStoredUser } from "../services/api";
+import { useCall } from "../context/CallContext";
 import UserAvatar from "./UserAvatar";
 
 const navigation = [
@@ -36,8 +37,11 @@ const navigation = [
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(() => getStoredUser());
+  const { callPhase, callSession } = useCall();
   const location = useLocation();
   const navigate = useNavigate();
+  const showCallBanner = callPhase !== "idle" && callPhase !== "ended";
+  const incomingCallerId = callPhase === "incoming" ? callSession?.caller_id : null;
   const visibleNavigation = useMemo(
     () => navigation.filter((item) => !item.adminOnly || user?.role === "admin"),
     [user?.role]
@@ -119,11 +123,16 @@ export default function DashboardLayout({ children }) {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`sidebar-link ${isActive ? "active" : ""}`}
+                className={`sidebar-link ${isActive ? "active" : ""} ${
+                  item.href === "/user-chat" && incomingCallerId ? "ring-2 ring-emerald-400 ring-offset-2" : ""
+                }`}
                 onClick={() => setSidebarOpen(false)}
               >
                 <Icon className="h-[13px] w-[13px] shrink-0" />
                 <span className="truncate">{item.name}</span>
+                {item.href === "/user-chat" && incomingCallerId ? (
+                  <span className="ml-auto inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-500" />
+                ) : null}
               </Link>
             );
           })}
@@ -147,8 +156,8 @@ export default function DashboardLayout({ children }) {
         </div>
       </aside>
 
-      <div className="lg:pl-72">
-        <header className="sticky top-0 z-30 flex h-[52px] items-center border-b border-[#e7ebee] bg-white/95 px-4 backdrop-blur sm:px-5">
+      <div className={`lg:pl-72 ${showCallBanner ? "pt-14" : ""}`}>
+        <header className="sticky top-0 z-30 flex h-[52px] items-center border-b border-[#e7ebee] bg-white/95 px-4 backdrop-blur sm:px-5" style={showCallBanner ? { top: "3.5rem" } : undefined}>
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}

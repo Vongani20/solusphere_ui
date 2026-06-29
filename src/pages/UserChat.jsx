@@ -85,7 +85,17 @@ export default function UserChat() {
   const [error, setError] = useState("");
   const [chatError, setChatError] = useState("");
   const currentUser = getStoredUser();
-  const { startCall, inCall, busy: callBusy } = useCall();
+  const {
+    startCall,
+    inCall,
+    busy: callBusy,
+    callPhase,
+    callSession,
+    callType,
+    acceptCall,
+    rejectCall,
+    endCall,
+  } = useCall();
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -95,10 +105,42 @@ export default function UserChat() {
 
   const activeUserID = conversationKey(activeUser);
 
+  const callPeerId = useMemo(() => {
+    if (!callSession) return null;
+    return callSession.caller_id === currentUser?.id ? callSession.callee_id : callSession.caller_id;
+  }, [callSession, currentUser?.id]);
+
+  const callWithActiveUser = Boolean(activeUserID && callPeerId === activeUserID);
+  const showCallPanel = inCall && callPhase !== "ended" && (callWithActiveUser || callPhase === "incoming");
+
+  const callStatusLabel = useMemo(() => {
+    if (!callSession || callPhase === "idle" || callPhase === "ended") return "";
+    const peerName =
+      callSession.caller_id === currentUser?.id ? callSession.callee_username : callSession.caller_username;
+    const kind = callType === "video" ? "Video" : "Voice";
+    if (callPhase === "incoming") return `Incoming ${kind.toLowerCase()} call from ${peerName}`;
+    if (callPhase === "outgoing") return `Calling ${peerName}...`;
+    if (callPhase === "connecting") return `Connecting to ${peerName}...`;
+    if (callPhase === "active") return `${kind} call with ${peerName}`;
+    return "";
+  }, [callPhase, callSession, callType, currentUser?.id]);
+
   const otherUsers = useMemo(() => {
     const conversationIDs = new Set(conversations.map((item) => item.user_id));
     return users.filter((user) => !conversationIDs.has(user.id));
   }, [conversations, users]);
+
+  useEffect(() => {
+    if (callPhase !== "incoming" || !callSession?.caller_id) return;
+    const callerId = callSession.caller_id;
+    setActiveUser((current) => {
+      if (conversationKey(current) === callerId) return current;
+      const fromConversations = conversations.find((item) => item.user_id === callerId);
+      if (fromConversations) return fromConversations;
+      const fromUsers = users.find((item) => item.id === callerId);
+      return fromUsers || current;
+    });
+  }, [callPhase, callSession, conversations, users]);
 
   const loadSidebar = useCallback(async () => {
     setLoadingSidebar(true);
@@ -342,7 +384,14 @@ export default function UserChat() {
                     {loadingSidebar ? "Loading conversations..." : "No conversations yet"}
                   </div>
                 ) : (
-                  conversations.map((conversation) => (
+                  conversations.map((conversation) => {
+                    const isRinging =
+                      callPhase === "incoming" && conversation.user_id === callSession?.caller_id;
+                    const isOnCall =
+                      callPeerId === conversation.user_id &&
+                      ["outgoing", "connecting", "active"].includes(callPhase);
+
+                    return (
                     <button
                       key={conversation.user_id}
                       type="button"
@@ -350,12 +399,28 @@ export default function UserChat() {
                       className={`w-full rounded-lg border p-4 text-left transition ${
                         activeUserID === conversation.user_id
                           ? "border-primary bg-primary/5"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          : isRinging
+                            ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-300"
+                            : isOnCall
+                              ? "border-sky-400 bg-sky-50"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate font-bold text-slate-950">{conversation.username}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="truncate font-bold text-slate-950">{conversation.username}</p>
+                            {isRinging ? (
+                              <span className="inline-flex animate-pulse rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                                Ringing
+                              </span>
+                            ) : null}
+                            {isOnCall ? (
+                              <span className="inline-flex rounded-full bg-sky-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                                On call
+                              </span>
+                            ) : null}
+                          </div>
                           <p className="mt-1 line-clamp-2 text-sm text-slate-500">
                             {conversation.latest_message || "Start chatting"}
                           </p>
@@ -367,7 +432,8 @@ export default function UserChat() {
                         ) : null}
                       </div>
                     </button>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -449,6 +515,38 @@ export default function UserChat() {
                   </button>
                 </div>
               </div>
+
+              {showCallPanel && callStatusLabel ? (
+                <div
+                  className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 ${
+                    callPhase === "incoming"
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                      : "border-sky-300 bg-sky-50 text-sky-950"
+                  }`}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5 shrink-0">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-60" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-current" />
+                    </span>
+                    <p className="text-sm font-bold">{callStatusLabel}</p>
+                  </div>
+                  {callPhase === "incoming" ? (
+                    <div className="flex gap-2">
+                      <button type="button" onClick={rejectCall} className="btn btn-secondary px-3 py-1.5 text-sm">
+                        Decline
+                      </button>
+                      <button type="button" onClick={acceptCall} className="btn btn-primary px-3 py-1.5 text-sm">
+                        Accept
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={endCall} className="btn btn-danger px-3 py-1.5 text-sm">
+                      {callPhase === "outgoing" ? "Cancel call" : "End call"}
+                    </button>
+                  )}
+                </div>
+              ) : null}
 
               {chatError ? (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900">
