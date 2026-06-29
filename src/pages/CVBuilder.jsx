@@ -212,9 +212,7 @@ export default function CVBuilder() {
     const formData = new FormData();
     formData.append("photo", file);
     try {
-      const res = await api.post("/cv/photo", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await api.post("/cv/photo", formData);
       setForm((p) => ({ ...p, profile_photo_url: res.data.profile_photo_url }));
       if (photoBlobRef.current) URL.revokeObjectURL(photoBlobRef.current);
       const blob = URL.createObjectURL(file);
@@ -265,9 +263,9 @@ export default function CVBuilder() {
     <DashboardLayout>
       <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">CV Builder</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Build your SoluGrowth professional CV and download it as a branded PDF.
+          <h1 className="text-sm font-bold text-heading">CV Builder</h1>
+          <p className="mt-0.5 text-[9px] font-medium text-muted">
+            Build your branded SoluGrowth CV → download PDF
           </p>
         </div>
 
@@ -909,20 +907,25 @@ function StepIndicator({ current }) {
             <li key={label} className="flex flex-1 items-center">
               <div className="flex flex-col items-center">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-colors
-                    ${done ? "bg-primary text-white" : active ? "bg-primary text-white ring-4 ring-primary/20" : "bg-slate-200 text-slate-500"}`}
+                  className={
+                    done
+                      ? "step-circle-active"
+                      : active
+                        ? "step-circle-active"
+                        : "step-circle-inactive"
+                  }
                 >
-                  {done ? <CheckCircleIcon className="h-5 w-5" /> : num}
+                  {done ? <CheckCircleIcon className="h-4 w-4" /> : num}
                 </div>
                 <span
-                  className={`mt-1 hidden text-xs font-medium sm:block ${active ? "text-primary" : "text-slate-400"}`}
+                  className={`mt-1 hidden text-[8px] font-semibold sm:block ${active ? "text-primary" : "text-muted"}`}
                 >
-                  {label}
+                  {label.split(" ")[0]}
                 </span>
               </div>
               {i < STEPS.length - 1 && (
                 <div
-                  className={`mx-1 h-0.5 flex-1 transition-colors ${current > num ? "bg-primary" : "bg-slate-200"}`}
+                  className={`mx-1 mb-3.5 h-0.5 flex-1 transition-colors ${current > num ? "bg-primary" : "bg-[#dde3e7]"}`}
                 />
               )}
             </li>

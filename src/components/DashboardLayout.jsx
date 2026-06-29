@@ -75,40 +75,40 @@ export default function DashboardLayout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
+    <div className="min-h-screen bg-surface text-heading">
       {sidebarOpen && (
         <button
           type="button"
           aria-label="Close navigation"
-          className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-heading/40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col border-r border-slate-200 bg-white transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col border-r border-[#e1e6ea] bg-sidebar transition-transform duration-300 lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
-          <Link to="/dashboard" className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
-            <img src="/icon.png" alt="" className="h-9 w-9 rounded-lg object-contain" />
+        <div className="flex h-14 items-center justify-between border-b border-[#e1e6ea] px-4">
+          <Link to="/dashboard" className="flex items-center gap-2.5" onClick={() => setSidebarOpen(false)}>
+            <img src="/icon.png" alt="" className="h-6 w-6 rounded-md object-contain" />
             <div>
-              <p className="text-base font-bold leading-tight text-slate-950">SoluSphere</p>
-              <p className="text-xs font-medium text-slate-500">Operations UI</p>
+              <p className="text-xs font-bold leading-tight text-heading">SoluSphere</p>
+              <p className="text-[8px] font-medium text-muted">Operations UI</p>
             </div>
           </Link>
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 lg:hidden"
+            className="rounded-md p-1.5 text-muted hover:bg-white hover:text-heading lg:hidden"
             aria-label="Close navigation"
           >
             <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
           {visibleNavigation.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -122,63 +122,57 @@ export default function DashboardLayout({ children }) {
                 className={`sidebar-link ${isActive ? "active" : ""}`}
                 onClick={() => setSidebarOpen(false)}
               >
-                <Icon className="h-5 w-5 shrink-0" />
+                <Icon className="h-[13px] w-[13px] shrink-0" />
                 <span className="truncate">{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="border-t border-slate-200 p-4">
-          <div className="mb-3 flex items-center gap-3 rounded-lg bg-slate-50 p-3">
-            <UserAvatar user={user} />
+        <div className="border-t border-[#e1e6ea] p-3">
+          <div className="mb-2.5 flex items-center gap-2 rounded-md bg-white/60 p-2">
+            <UserAvatar user={user} className="h-[26px] w-[26px]" iconClassName="h-4 w-4" />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">{user?.username || "Signed in"}</p>
-              <p className="truncate text-xs text-slate-500">{user?.role || user?.email || "User"}</p>
+              <p className="truncate text-[11px] font-semibold text-heading">{user?.username || "Signed in"}</p>
+              <p className="truncate text-[9px] text-muted">{user?.role || user?.email || "User"}</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11px] font-semibold text-[#c0473f] hover:bg-[#fde8e8]"
           >
-            <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+            <ArrowLeftOnRectangleIcon className="h-4 w-4" />
             Logout
           </button>
         </div>
       </aside>
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-30 flex h-[52px] items-center border-b border-[#e7ebee] bg-white/95 px-4 backdrop-blur sm:px-5">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="mr-3 rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 lg:hidden"
+            className="mr-2.5 rounded-md p-1.5 text-nav-idle hover:bg-sidebar hover:text-heading lg:hidden"
             aria-label="Open navigation"
           >
-            <Bars3Icon className="h-6 w-6" />
+            <Bars3Icon className="h-5 w-5" />
           </button>
 
           <div className="flex min-w-0 flex-1 items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="truncate text-lg font-bold text-slate-950">{currentPage}</p>
-              <p className="hidden text-xs text-slate-500 sm:block">SoluSphere workspace</p>
+              <p className="truncate text-sm font-bold text-heading">{currentPage}</p>
+              <p className="hidden text-[9px] font-medium text-muted sm:block">SoluSphere workspace</p>
             </div>
-            <div className="flex items-center gap-3">
-              <span
-                className={`hidden rounded-full px-3 py-1 text-xs font-semibold ring-1 sm:inline-flex ${
-                  user?.face_status
-                    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                    : "bg-amber-50 text-amber-700 ring-amber-200"
-                }`}
-              >
+            <div className="flex items-center gap-2">
+              <span className={`face-badge hidden sm:inline-flex ${!user?.face_status ? "!border-[#b07d20]/30 !bg-[#fff4e0] !text-[#b07d20]" : ""}`}>
                 {user?.face_status ? "Face verified" : "Face setup pending"}
               </span>
-              <UserAvatar user={user} />
+              <UserAvatar user={user} className="h-7 w-7" iconClassName="h-4 w-4" />
             </div>
           </div>
         </header>
 
-        <main className="p-4 sm:p-6">{children}</main>
+        <main className="p-4 sm:p-5">{children}</main>
       </div>
     </div>
   );

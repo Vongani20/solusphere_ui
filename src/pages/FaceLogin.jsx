@@ -1,10 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  ArrowLeftIcon,
-  FaceSmileIcon,
-} from "@heroicons/react/24/outline";
+import { useNavigate } from "react-router-dom";
 import FaceScanGuide from "../components/FaceScanGuide";
+import AuthLayout, { AuthAlert } from "../components/AuthLayout";
 import api, { getApiError, saveSession } from "../services/api";
 
 export default function FaceLogin() {
@@ -61,7 +58,7 @@ export default function FaceLogin() {
       if (capturedImage?.url) URL.revokeObjectURL(capturedImage.url);
       setCapturedImage({ blob, url: URL.createObjectURL(blob) });
       setError("");
-    }, "image/jpeg");
+    }, "image/jpeg", 0.92);
   };
 
   const handleFaceLogin = async () => {
@@ -77,9 +74,7 @@ export default function FaceLogin() {
     formData.append("face", capturedImage.blob, "face.jpg");
 
     try {
-      const res = await api.post("/auth/face-login", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await api.post("/auth/face-login", formData);
       saveSession({ token: res.data.token, user: res.data.user });
       navigate("/dashboard");
     } catch (err) {
@@ -90,44 +85,25 @@ export default function FaceLogin() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#070b13] p-4">
-      <div className="w-full max-w-md">
-        <Link to="/login" className="mb-5 inline-flex items-center gap-2 font-semibold text-white hover:text-cyan-100">
-          <ArrowLeftIcon className="h-5 w-5" />
-          Back to Login
-        </Link>
+    <AuthLayout
+      heroTitle="Face Login"
+      heroSubtitle="Biometric sign-in via webcam"
+      backLink={{ to: "/login", label: "← Back to Login" }}
+    >
+      {error && <AuthAlert tone="error">{error}</AuthAlert>}
 
-        <div className="mb-5 flex items-center justify-center gap-3 text-white">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/10">
-            <FaceSmileIcon className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-white">Face Login</h1>
-            <p className="text-sm text-white/55">Biometric sign-in</p>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-4 rounded-lg border border-rose-300/30 bg-rose-500/15 p-3 text-sm font-semibold text-white">
-            {error}
-          </div>
-        )}
-
-        <FaceScanGuide
-          videoRef={videoRef}
-          imageUrl={capturedImage?.url}
-          cameraActive={!capturedImage}
-          status={loading ? "Matching securely >>>" : "Scanning for match >>>"}
-          primaryLabel={capturedImage ? (loading ? "Authenticating..." : "Use this face") : "Start scan"}
-          onPrimary={capturedImage ? handleFaceLogin : captureFace}
-          secondaryLabel="Try another way"
-          onSecondary={capturedImage ? () => setCapturedImage(null) : () => navigate("/login")}
-          cancelLabel="Cancel"
-          onCancel={() => navigate("/login")}
-          disabled={loading}
-        />
-        <canvas ref={canvasRef} className="hidden" />
-      </div>
-    </div>
+      <FaceScanGuide
+        videoRef={videoRef}
+        imageUrl={capturedImage?.url}
+        cameraActive={!capturedImage}
+        status="Center your face inside the ring"
+        primaryLabel={capturedImage ? (loading ? "Authenticating..." : "Use this face") : "Start Face Scan"}
+        onPrimary={capturedImage ? handleFaceLogin : captureFace}
+        secondaryLabel="password login"
+        onSecondary={capturedImage ? () => setCapturedImage(null) : () => navigate("/login")}
+        disabled={loading}
+      />
+      <canvas ref={canvasRef} className="hidden" />
+    </AuthLayout>
   );
 }

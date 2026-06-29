@@ -133,7 +133,7 @@ export default function HelpDesk() {
                   <h2 className="mt-2 text-xl font-bold text-slate-950">{ticket.subject}</h2>
                   <p className="mt-1 text-sm text-slate-500">{formatDate(ticket.created_at)}</p>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusTone(ticket.status)}`}>
+                <span className={statusTone(ticket.status)}>
                   {ticket.status}
                 </span>
               </div>

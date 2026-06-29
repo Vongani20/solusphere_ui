@@ -323,9 +323,7 @@ export default function Admin() {
 
     const formData = new FormData();
     formData.append("file", eventImageFile);
-    const uploadRes = await api.post("/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const uploadRes = await api.post("/upload", formData);
     return uploadRes.data.file_url || "";
   };
 
@@ -1121,7 +1119,7 @@ function RecordRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-sm font-bold text-slate-950">{title}</p>
-            {meta && <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${statusTone(statusKey || meta)}`}>{meta}</span>}
+            {meta && <span className={statusTone(statusKey || meta)}>{meta}</span>}
           </div>
           <p className="mt-1 line-clamp-2 text-sm text-slate-500">{detail || "No detail"}</p>
           {subDetail && <p className="mt-1 text-xs font-medium text-slate-400">{subDetail}</p>}
