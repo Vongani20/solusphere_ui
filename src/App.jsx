@@ -18,6 +18,7 @@ import CVBuilder from "./pages/CVBuilder";
 import AdminRoute from "./components/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { CallProvider } from "./context/CallContext";
 
 function App() {
   const defaultRoute = localStorage.getItem("token") ? "/dashboard" : "/login";
@@ -25,6 +26,7 @@ function App() {
   return (
     <Router>
       <ErrorBoundary>
+        <CallProvider>
         <Routes>
         <Route path="/" element={<Navigate to={defaultRoute} replace />} />
         <Route path="/login" element={<Login />} />
@@ -123,6 +125,7 @@ function App() {
         />
         <Route path="*" element={<Navigate to={defaultRoute} replace />} />
         </Routes>
+        </CallProvider>
       </ErrorBoundary>
     </Router>
   );
