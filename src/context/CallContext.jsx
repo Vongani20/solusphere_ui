@@ -36,6 +36,21 @@ const ICE_SERVERS = [
   },
 ];
 
+function prepareSdpForSignaling(sdp) {
+  if (!sdp || typeof sdp !== "string") return sdp;
+
+  const lines = sdp
+    .replace(/\u0000/g, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !line.startsWith("a=ssrc:") && !line.startsWith("a=ssrc-group:"));
+
+  return `${lines.join("\r\n")}\r\n`;
+}
+
 function peerLabel(call, currentUserId) {
   if (!call) return "User";
   if (call.caller_id === currentUserId) return call.callee_username || "User";
@@ -78,6 +93,30 @@ function MediaTile({ stream, muted = false, label, className = "" }) {
       className={`bg-slate-900 object-cover ${className}`}
     />
   );
+}
+
+function formatCallError(err, fallback) {
+  if (err?.response) {
+    return getApiError(err, fallback);
+  }
+
+  const name = err?.name || "";
+  const message = typeof err?.message === "string" ? err.message.trim() : "";
+
+  if (name === "NotAllowedError" || /permission/i.test(message)) {
+    return "Microphone access was blocked. Allow camera/microphone in your browser settings and try again.";
+  }
+  if (name === "NotFoundError") {
+    return "No microphone or camera was found on this device.";
+  }
+  if (name === "NotReadableError" || /in use|busy|starting/i.test(message)) {
+    return "Your microphone is already in use, often by another browser tab. Close other call tabs and try again.";
+  }
+  if (message) {
+    return message;
+  }
+
+  return fallback;
 }
 
 function callStatusText(callPhase, callType, label) {
@@ -524,7 +563,9 @@ export function CallProvider({ children }) {
   const setRemoteDescription = useCallback(
     async (description) => {
       const pc = pcRef.current;
-      if (!pc) return;
+      if (!pc) {
+        throw new Error("Call connection was not ready. Try again.");
+      }
       await pc.setRemoteDescription(description);
       remoteDescriptionSetRef.current = true;
       await flushPendingRemoteCandidates();
@@ -584,7 +625,10 @@ export function CallProvider({ children }) {
             !remoteDescriptionSetRef.current
           ) {
             setCallPhase("connecting");
-            await setRemoteDescription({ type: "answer", sdp: call.answer_sdp });
+            await setRemoteDescription({
+              type: "answer",
+              sdp: prepareSdpForSignaling(call.answer_sdp),
+            });
             setCallPhase("active");
           }
 
@@ -632,14 +676,16 @@ export function CallProvider({ children }) {
         pcRef.current = pc;
 
         const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: type === "video" });
+        await pc.setLocalDescription(offer);
+        const offerSdp = prepareSdpForSignaling(pc.localDescription?.sdp || offer.sdp);
+
         const res = await api.post(`/chats/${peerUserId}/calls`, {
           call_type: type,
-          offer: { type: offer.type, sdp: offer.sdp },
+          offer: { type: offer.type, sdp: offerSdp },
         });
 
         const call = res.data.call;
         callIdRef.current = call.id;
-        await pc.setLocalDescription(offer);
 
         setCallSession(call);
         setCallPhase("outgoing");
@@ -658,49 +704,78 @@ export function CallProvider({ children }) {
 
   const acceptCall = useCallback(async () => {
     if (!callSession?.id) return;
-    if (!callSession.offer_sdp) {
-      setCallError("Call offer was missing. Ask the caller to try again.");
-      return;
-    }
 
+    const callId = callSession.id;
     setBusy(true);
     setCallError("");
-    setCallType(callSession.call_type || "audio");
-    resetPeerState();
 
     try {
-      const stream = await getMedia(callSession.call_type || "audio");
+      const freshRes = await api.get(`/chats/calls/${callId}`, {
+        params: { _ts: Date.now() },
+        headers: { "Cache-Control": "no-cache" },
+      });
+      const freshCall = freshRes.data.call;
+      const mediaType = freshCall.call_type || callSession.call_type || "audio";
+
+      if (freshCall.status !== "ringing") {
+        throw new Error(
+          freshCall.status === "ended" || freshCall.status === "missed"
+            ? "This call is no longer available."
+            : `Call is already ${freshCall.status}.`
+        );
+      }
+
+      const offerSdp = freshCall.offer_sdp;
+      if (!offerSdp) {
+        throw new Error("Call offer was missing. Ask the caller to try again.");
+      }
+
+      setCallType(mediaType);
+      setCallSession(freshCall);
+      resetPeerState();
+
+      const stream = await getMedia(mediaType);
       localStreamRef.current = stream;
       setLocalStream(stream);
-      const pc = createPeerConnection(callSession.id, stream);
+
+      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      attachPeerHandlers(pc);
+      pcRef.current = pc;
+      callIdRef.current = callId;
 
       setCallPhase("connecting");
-      await setRemoteDescription({ type: "offer", sdp: callSession.offer_sdp });
+      await pc.setRemoteDescription({ type: "offer", sdp: prepareSdpForSignaling(offerSdp) });
+      remoteDescriptionSetRef.current = true;
+      await flushPendingRemoteCandidates();
+
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
+      const answerSdp = prepareSdpForSignaling(pc.localDescription?.sdp || answer.sdp);
 
-      const res = await api.post(`/chats/calls/${callSession.id}/accept`, {
-        answer: { type: answer.type, sdp: answer.sdp },
+      const res = await api.post(`/chats/calls/${callId}/accept`, {
+        answer: { type: answer.type, sdp: answerSdp },
       });
 
       setCallSession(res.data.call);
       setCallPhase("active");
-      startPolling(callSession.id, "callee");
+      startPolling(callId, "callee");
     } catch (err) {
       cleanupMedia();
-      setCallError(getApiError(err, "Failed to accept call."));
+      setCallError(formatCallError(err, "Failed to accept call."));
       setCallPhase("idle");
       setCallSession(null);
     } finally {
       setBusy(false);
     }
   }, [
+    attachPeerHandlers,
     callSession,
     cleanupMedia,
-    createPeerConnection,
+    flushPendingRemoteCandidates,
     getMedia,
     resetPeerState,
-    setRemoteDescription,
     startPolling,
   ]);
 
@@ -733,6 +808,32 @@ export function CallProvider({ children }) {
     }
     resetCall();
   }, [callPhase, callSession, resetCall]);
+
+  useEffect(() => {
+    if (callPhase !== "incoming" || !callSession?.id) return undefined;
+
+    const refreshIncomingCall = async () => {
+      try {
+        const res = await api.get(`/chats/calls/${callSession.id}`, {
+          params: { _ts: Date.now() },
+          headers: { "Cache-Control": "no-cache" },
+        });
+        const call = res.data.call;
+        if (call.status !== "ringing") {
+          setCallPhase(["ended", "missed", "rejected"].includes(call.status) ? "ended" : "idle");
+          setCallSession(null);
+          return;
+        }
+        setCallSession(call);
+      } catch {
+        // Ignore transient refresh errors.
+      }
+    };
+
+    refreshIncomingCall();
+    const timer = window.setInterval(refreshIncomingCall, 1500);
+    return () => window.clearInterval(timer);
+  }, [callPhase, callSession?.id]);
 
   useEffect(() => {
     if (!localStorage.getItem("token")) return undefined;
