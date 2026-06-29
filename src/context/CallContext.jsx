@@ -495,7 +495,9 @@ export function CallProvider({ children }) {
         const state = pc.connectionState;
         if (state === "connected") {
           setCallPhase("active");
-        } else if (state === "failed") {
+          return;
+        }
+        if (state === "failed" && remoteDescriptionSetRef.current) {
           setCallError("Call connection failed. Check your network and try again.");
           setCallPhase("ended");
           stopPolling();
@@ -646,6 +648,7 @@ export function CallProvider({ children }) {
         cleanupMedia();
         setCallError(getApiError(err, "Failed to start call."));
         setCallPhase("ended");
+        setCallSession((current) => current || { id: "", caller_username: "", callee_username: "Contact" });
       } finally {
         setBusy(false);
       }
@@ -747,8 +750,11 @@ export function CallProvider({ children }) {
           setCallType(calls[0].call_type || "audio");
           setCallPhase("incoming");
         }
-      } catch {
-        // Ignore polling errors.
+      } catch (err) {
+        const message = getApiError(err, "Could not check for incoming calls.");
+        if (err?.response?.status >= 500) {
+          setCallError(message);
+        }
       }
     };
 
@@ -789,7 +795,7 @@ export function CallProvider({ children }) {
     acceptCall,
     rejectCall,
     endCall,
-    inCall: callPhase !== "idle",
+    inCall: ["preparing", "incoming", "outgoing", "connecting", "active"].includes(callPhase),
   };
 
   return (
