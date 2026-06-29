@@ -11,11 +11,13 @@ import {
   VideoCameraIcon,
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
+import { AvatarWithPresence, PresenceIndicator } from "../components/PresenceIndicator";
 import UserAvatar from "../components/UserAvatar";
 import { useCall } from "../context/CallContext";
 import api, { getApiError, getStoredUser } from "../services/api";
 import { resolveImageUrl } from "../utils/assets";
 import { formatDate, titleize } from "../utils/formatters";
+import { formatPresenceLabel } from "../utils/presence";
 
 function conversationKey(user) {
   return user?.user_id ?? user?.id;
@@ -127,8 +129,15 @@ export default function UserChat() {
 
   const otherUsers = useMemo(() => {
     const conversationIDs = new Set(conversations.map((item) => item.user_id));
-    return users.filter((user) => !conversationIDs.has(user.id));
+    return users
+      .filter((user) => !conversationIDs.has(user.id))
+      .sort((a, b) => Number(b.is_online) - Number(a.is_online) || a.username.localeCompare(b.username));
   }, [conversations, users]);
+
+  const onlineCount = useMemo(
+    () => users.filter((user) => user.is_online).length,
+    [users]
+  );
 
   useEffect(() => {
     if (callPhase !== "incoming" || !callSession?.caller_id) return;
@@ -191,6 +200,13 @@ export default function UserChat() {
 
   useEffect(() => {
     loadSidebar();
+  }, [loadSidebar]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      loadSidebar();
+    }, 30000);
+    return () => window.clearInterval(timer);
   }, [loadSidebar]);
 
   useEffect(() => {
@@ -356,7 +372,9 @@ export default function UserChat() {
               </div>
               <div className="min-w-0">
                 <h1 className="truncate text-xl font-bold text-slate-950">Direct Chat</h1>
-                <p className="text-sm text-slate-500">{conversations.length} conversations</p>
+                <p className="text-sm text-slate-500">
+                  {onlineCount} available · {conversations.length} conversations
+                </p>
               </div>
             </div>
             <button
@@ -408,8 +426,9 @@ export default function UserChat() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <p className="truncate font-bold text-slate-950">{conversation.username}</p>
+                            <PresenceIndicator user={conversation} showLabel />
                             {isRinging ? (
                               <span className="inline-flex animate-pulse rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
                                 Ringing
@@ -457,9 +476,15 @@ export default function UserChat() {
                           : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                       }`}
                     >
-                      <UserAvatar user={user} className="h-9 w-9" iconClassName="h-5 w-5" />
-                      <div className="min-w-0">
-                        <p className="truncate font-bold text-slate-950">{user.username}</p>
+                      <AvatarWithPresence
+                        user={user}
+                        avatar={<UserAvatar user={user} className="h-9 w-9" iconClassName="h-5 w-5" />}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate font-bold text-slate-950">{user.username}</p>
+                          <PresenceIndicator user={user} showLabel />
+                        </div>
                         <p className="truncate text-sm text-slate-500">{user.email}</p>
                       </div>
                     </button>
@@ -475,12 +500,17 @@ export default function UserChat() {
             <>
               <div className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <UserAvatar user={activeUser} className="h-11 w-11" iconClassName="h-6 w-6" />
+                  <AvatarWithPresence
+                    user={activeUser}
+                    avatar={<UserAvatar user={activeUser} className="h-11 w-11" iconClassName="h-6 w-6" />}
+                  />
                   <div className="min-w-0">
                     <h2 className="truncate text-xl font-bold text-slate-950">{activeDisplayName}</h2>
                     <p className="text-sm text-slate-500">
-                      {activeRole ? `${activeRole} · ` : ""}
-                      Private conversation
+                      <span className={activeUser?.is_online ? "font-semibold text-emerald-600" : ""}>
+                        {formatPresenceLabel(activeUser)}
+                      </span>
+                      {activeRole ? ` · ${activeRole}` : ""}
                     </p>
                   </div>
                 </div>
@@ -489,6 +519,7 @@ export default function UserChat() {
                     type="button"
                     onClick={() => startCall(activeUserID, "audio")}
                     disabled={inCall || callBusy}
+                    title={activeUser?.is_online ? "Start voice call" : "User is offline — call may not be answered"}
                     className="btn btn-secondary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label="Start voice call"
                   >
@@ -499,6 +530,7 @@ export default function UserChat() {
                     type="button"
                     onClick={() => startCall(activeUserID, "video")}
                     disabled={inCall || callBusy}
+                    title={activeUser?.is_online ? "Start video call" : "User is offline — call may not be answered"}
                     className="btn btn-secondary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label="Start video call"
                   >

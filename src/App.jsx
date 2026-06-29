@@ -19,6 +19,12 @@ import AdminRoute from "./components/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { CallProvider } from "./context/CallContext";
+import usePresenceHeartbeat from "./hooks/usePresenceHeartbeat";
+
+function AppShell({ children }) {
+  usePresenceHeartbeat();
+  return children;
+}
 
 function App() {
   const defaultRoute = localStorage.getItem("token") ? "/dashboard" : "/login";
@@ -27,6 +33,7 @@ function App() {
     <Router>
       <ErrorBoundary>
         <CallProvider>
+        <AppShell>
         <Routes>
         <Route path="/" element={<Navigate to={defaultRoute} replace />} />
         <Route path="/login" element={<Login />} />
@@ -125,6 +132,7 @@ function App() {
         />
         <Route path="*" element={<Navigate to={defaultRoute} replace />} />
         </Routes>
+        </AppShell>
         </CallProvider>
       </ErrorBoundary>
     </Router>
