@@ -3,11 +3,12 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 
 const CONSENT_TEXT = `By signing below, I confirm that:
 
-1. I consent to Solusphere processing documents I upload (including CVs and business PDFs) using automated and AI-assisted tools.
-2. I understand that document text may be sent to third-party AI providers (such as OpenAI) solely to extract, analyse, and structure information for my use within Solusphere.
-3. I confirm that I have the legal right to upload the document and that it does not contain unlawful or unauthorised personal data of others without their permission.
-4. I understand that I should review all AI-generated results before saving, sharing, or relying on them.
-5. I may withdraw this consent by contacting support; previously processed records may be retained as required by law or platform policy.`;
+1. I consent to Solusphere storing and processing my CV profile data (including personal details, skills, experience, and profile photo) for CV generation and talent search when I save my CV.
+2. I consent to Solusphere processing documents I upload (including CV PDFs) using automated and AI-assisted tools.
+3. I understand that document text may be sent to third-party AI providers (such as OpenAI) solely to extract, analyse, and structure information for my use within Solusphere.
+4. I confirm that I have the legal right to upload the document and that it does not contain unlawful or unauthorised personal data of others without their permission.
+5. I understand that I should review all AI-generated results before saving, sharing, or relying on them.
+6. I may withdraw this consent by contacting support; previously processed records may be retained as required by law or platform policy.`;
 
 export default function DocumentConsentModal({
   open,
@@ -15,6 +16,7 @@ export default function DocumentConsentModal({
   onSigned,
   signing = false,
   error = "",
+  subtitle = "Required before saving, importing, or uploading photos in CV Builder",
 }) {
   const [accepted, setAccepted] = useState(false);
   const [signedName, setSignedName] = useState("");
@@ -45,9 +47,7 @@ export default function DocumentConsentModal({
         <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <h2 className="text-lg font-bold text-slate-950">Document Processing Consent</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Required before uploading CVs or PDFs for AI analysis
-            </p>
+            <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
           </div>
           <button
             type="button"

@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
 import DocumentConsentModal from "../components/DocumentConsentModal";
+import DocumentConsentPanel from "../components/DocumentConsentPanel";
 import api, { getApiError } from "../services/api";
 import { useDocumentProcessingConsent } from "../hooks/useDocumentProcessingConsent";
 import { resolveImageUrl } from "../utils/assets";
@@ -141,6 +142,12 @@ const cvApiError = (err, fallback) => {
   if (err?.response?.status === 428) {
     return { message: getApiError(err, FACE_REQUIRED_MESSAGE), faceRequired: true };
   }
+  if (err?.response?.status === 403 && err?.response?.data?.code === "consent_required") {
+    return {
+      message: getApiError(err, "Document processing consent is required."),
+      consentRequired: true,
+    };
+  }
   return { message: getApiError(err, fallback), faceRequired: false };
 };
 
@@ -183,12 +190,22 @@ export default function CVBuilder() {
   const photoBlobRef = useRef(null);
   const pendingImportFileRef = useRef(null);
   const {
+    consents,
+    loading: consentLoading,
     hasConsent,
     signConsent,
     signing: consentSigning,
     error: consentError,
   } = useDocumentProcessingConsent();
   const [consentOpen, setConsentOpen] = useState(false);
+
+  const openConsentModal = () => setConsentOpen(true);
+
+  const ensureConsent = () => {
+    if (hasConsent) return true;
+    openConsentModal();
+    return false;
+  };
 
   useEffect(() => {
     api
@@ -311,6 +328,11 @@ export default function CVBuilder() {
   // ─── API actions ─────────────────────────────────────────────────────────────
 
   const saveAndNext = async (nextStep) => {
+    if (!ensureConsent()) {
+      setError("Sign consent before saving your CV.");
+      return;
+    }
+
     setSaving(true);
     setError("");
     setFaceRequired(false);
@@ -333,12 +355,13 @@ export default function CVBuilder() {
     } catch (err) {
       const data = err?.response?.data;
       if (data?.fields) setFieldErrors(data.fields);
-      const { message, faceRequired: needsFace } = cvApiError(
+      const { message, faceRequired: needsFace, consentRequired } = cvApiError(
         err,
         "Save failed. Check the highlighted fields."
       );
       setError(message);
       setFaceRequired(needsFace);
+      if (consentRequired) openConsentModal();
     } finally {
       setSaving(false);
     }
@@ -367,12 +390,13 @@ export default function CVBuilder() {
       setMessage(res.data?.message || "CV imported. Review each step and save when ready.");
       setStep(1);
     } catch (err) {
-      const { message, faceRequired: needsFace } = cvApiError(
+      const { message, faceRequired: needsFace, consentRequired } = cvApiError(
         err,
         "Could not import CV. Upload a text-based PDF and try again."
       );
       setError(message);
       setFaceRequired(needsFace);
+      if (consentRequired) openConsentModal();
     } finally {
       setImportingCv(false);
     }
@@ -408,6 +432,12 @@ export default function CVBuilder() {
   const uploadPhoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!ensureConsent()) {
+      setError("Sign consent before uploading a profile photo.");
+      setPhotoFileInputKey((k) => k + 1);
+      return;
+    }
+
     setUploadingPhoto(true);
     setError("");
     setFaceRequired(false);
@@ -424,9 +454,10 @@ export default function CVBuilder() {
       setPhotoFileInputKey((k) => k + 1);
       setMessage("Photo updated.");
     } catch (err) {
-      const { message, faceRequired: needsFace } = cvApiError(err, "Photo upload failed.");
+      const { message, faceRequired: needsFace, consentRequired } = cvApiError(err, "Photo upload failed.");
       setError(message);
       setFaceRequired(needsFace);
+      if (consentRequired) openConsentModal();
     } finally {
       setUploadingPhoto(false);
     }
@@ -480,15 +511,33 @@ export default function CVBuilder() {
           </p>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <DocumentConsentPanel
+          loading={consentLoading}
+          hasConsent={hasConsent}
+          consents={consents}
+          onSignClick={openConsentModal}
+          title="CV Builder consent required"
+          description="You must sign consent before saving your CV, importing a PDF, or uploading a profile photo."
+        />
+
+        <div className={`rounded-lg border border-slate-200 bg-white p-4 shadow-sm ${!hasConsent ? "opacity-60" : ""}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-bold text-heading">Import from PDF</p>
               <p className="mt-0.5 text-[9px] text-muted">
                 AI reads your CV and fills the wizard. Review every field before saving.
               </p>
+              {!hasConsent && !consentLoading && (
+                <p className="mt-2 text-[10px] font-semibold text-amber-800">Sign consent above to enable import.</p>
+              )}
             </div>
-            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+            <label
+              className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold text-white ${
+                hasConsent && !importingCv
+                  ? "cursor-pointer bg-slate-900 hover:bg-slate-700"
+                  : "cursor-not-allowed bg-slate-400"
+              }`}
+            >
               <DocumentArrowUpIcon className="h-4 w-4" />
               {importingCv ? "Importing..." : "Upload CV (PDF)"}
               <input
@@ -496,7 +545,7 @@ export default function CVBuilder() {
                 type="file"
                 accept="application/pdf,.pdf"
                 className="hidden"
-                disabled={importingCv}
+                disabled={importingCv || !hasConsent}
                 onChange={importCvDocument}
               />
             </label>
@@ -511,6 +560,12 @@ export default function CVBuilder() {
         </div>
 
         <StepIndicator current={step} />
+
+        {!consentLoading && !hasConsent && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Complete the consent above to start filling in and saving your CV.
+          </div>
+        )}
 
         {error && (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -532,7 +587,7 @@ export default function CVBuilder() {
           </div>
         )}
 
-        {step === 1 && (
+        {hasConsent && step === 1 && (
           <Step1
             form={form}
             setForm={setForm}
@@ -541,7 +596,7 @@ export default function CVBuilder() {
             onNext={() => saveAndNext(2)}
           />
         )}
-        {step === 2 && (
+        {hasConsent && step === 2 && (
           <Step2
             form={form}
             fieldErrors={fieldErrors}
@@ -559,7 +614,7 @@ export default function CVBuilder() {
             onNext={() => saveAndNext(3)}
           />
         )}
-        {step === 3 && (
+        {hasConsent && step === 3 && (
           <Step3
             form={form}
             fieldErrors={fieldErrors}
@@ -574,7 +629,7 @@ export default function CVBuilder() {
             onNext={() => saveAndNext(4)}
           />
         )}
-        {step === 4 && (
+        {hasConsent && step === 4 && (
           <Step4
             form={form}
             photoPreview={photoPreview}
@@ -599,6 +654,7 @@ export default function CVBuilder() {
         onSigned={handleConsentSigned}
         signing={consentSigning}
         error={consentError}
+        subtitle="Required before saving, importing, or uploading photos in CV Builder"
       />
     </DashboardLayout>
   );
