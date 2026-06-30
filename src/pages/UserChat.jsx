@@ -9,6 +9,7 @@ import {
   StopIcon,
   UserIcon,
   VideoCameraIcon,
+  PhoneXMarkIcon,
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
 import { AvatarWithPresence, PresenceIndicator } from "../components/PresenceIndicator";
@@ -27,6 +28,23 @@ function messagePreview(message) {
   if (message.message_type === "image") return message.message || "Photo";
   if (message.message_type === "voice") return message.message || "Voice note";
   return message.message;
+}
+
+function conversationPreviewIcon(type) {
+  switch (type) {
+    case "voice":
+      return MicrophoneIcon;
+    case "image":
+      return PhotoIcon;
+    case "missed_call":
+      return PhoneXMarkIcon;
+    case "video_call":
+      return VideoCameraIcon;
+    case "voice_call":
+      return PhoneIcon;
+    default:
+      return ChatBubbleLeftRightIcon;
+  }
 }
 
 function ChatMessageBubble({ message, ownMessage, currentUser }) {
@@ -76,6 +94,7 @@ function ChatMessageBubble({ message, ownMessage, currentUser }) {
 
 export default function UserChat() {
   const [conversations, setConversations] = useState([]);
+  const [inbox, setInbox] = useState({ unread_messages: 0, missed_calls: 0 });
   const [users, setUsers] = useState([]);
   const [activeUser, setActiveUser] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -163,6 +182,7 @@ export default function UserChat() {
       const loadedConversations = conversationsRes.data.conversations || [];
       const loadedUsers = usersRes.data.users || [];
       setConversations(loadedConversations);
+      setInbox(conversationsRes.data.inbox || { unread_messages: 0, missed_calls: 0 });
       setUsers(loadedUsers);
       setActiveUser((current) => {
         const currentID = conversationKey(current);
@@ -211,11 +231,11 @@ export default function UserChat() {
 
   useEffect(() => {
     if (activeUserID) {
-      loadMessages(activeUserID);
+      loadMessages(activeUserID).then(() => loadSidebar());
     } else {
       setMessages([]);
     }
-  }, [activeUserID, loadMessages]);
+  }, [activeUserID, loadMessages, loadSidebar]);
 
   useEffect(() => {
     if (!activeUserID) return undefined;
@@ -252,8 +272,10 @@ export default function UserChat() {
         email: existing?.email || "",
         role: existing?.role || "",
         latest_message: preview,
+        latest_message_type: message.message_type || "text",
         latest_message_at: message.created_at,
         unread_count: existing?.unread_count || 0,
+        missed_call_count: existing?.missed_call_count || 0,
       };
       const rest = items.filter((item) => item.user_id !== otherID);
       return [updated, ...rest];
@@ -374,6 +396,9 @@ export default function UserChat() {
                 <h1 className="truncate text-xl font-bold text-slate-950">Direct Chat</h1>
                 <p className="text-sm text-slate-500">
                   {onlineCount} available · {conversations.length} conversations
+                  {inbox.unread_messages > 0 || inbox.missed_calls > 0
+                    ? ` · ${inbox.unread_messages} new message${inbox.unread_messages === 1 ? "" : "s"}${inbox.missed_calls > 0 ? ` · ${inbox.missed_calls} missed call${inbox.missed_calls === 1 ? "" : "s"}` : ""}`
+                    : ""}
                 </p>
               </div>
             </div>
@@ -408,6 +433,8 @@ export default function UserChat() {
                     const isOnCall =
                       callPeerId === conversation.user_id &&
                       ["outgoing", "connecting", "active"].includes(callPhase);
+                    const PreviewIcon = conversationPreviewIcon(conversation.latest_message_type);
+                    const hasMissed = conversation.missed_call_count > 0;
 
                     return (
                     <button
@@ -421,7 +448,11 @@ export default function UserChat() {
                             ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-300"
                             : isOnCall
                               ? "border-sky-400 bg-sky-50"
-                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                              : hasMissed
+                                ? "border-amber-300 bg-amber-50 hover:border-amber-400"
+                                : conversation.unread_count > 0
+                                  ? "border-primary/30 bg-primary/5 hover:border-primary/40"
+                                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -439,16 +470,40 @@ export default function UserChat() {
                                 On call
                               </span>
                             ) : null}
+                            {hasMissed && !isRinging ? (
+                              <span className="inline-flex rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                                Missed call
+                              </span>
+                            ) : null}
                           </div>
-                          <p className="mt-1 line-clamp-2 text-sm text-slate-500">
-                            {conversation.latest_message || "Start chatting"}
+                          <p className="mt-1 flex items-center gap-1.5 line-clamp-2 text-sm text-slate-500">
+                            <PreviewIcon
+                              className={`h-4 w-4 shrink-0 ${
+                                conversation.latest_message_type === "missed_call" ? "text-amber-600" : ""
+                              }`}
+                            />
+                            <span>{conversation.latest_message || "Start chatting"}</span>
                           </p>
                         </div>
-                        {conversation.unread_count > 0 ? (
-                          <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-2 text-xs font-bold text-white">
-                            {conversation.unread_count}
-                          </span>
-                        ) : null}
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          {hasMissed ? (
+                            <span
+                              className="inline-flex h-6 min-w-6 items-center justify-center gap-1 rounded-full bg-amber-500 px-2 text-xs font-bold text-white"
+                              title="Missed calls"
+                            >
+                              <PhoneXMarkIcon className="h-3.5 w-3.5" />
+                              {conversation.missed_call_count}
+                            </span>
+                          ) : null}
+                          {conversation.unread_count > 0 ? (
+                            <span
+                              className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-2 text-xs font-bold text-white"
+                              title="Unread messages"
+                            >
+                              {conversation.unread_count}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     </button>
                     );

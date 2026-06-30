@@ -18,6 +18,7 @@ import {
 } from "@heroicons/react/24/outline";
 import api, { clearSession, getStoredUser } from "../services/api";
 import { useCall } from "../context/CallContext";
+import { useChatInbox } from "../hooks/useChatInbox";
 import UserAvatar from "./UserAvatar";
 
 const navigation = [
@@ -38,6 +39,8 @@ export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(() => getStoredUser());
   const { callPhase, callSession } = useCall();
+  const inbox = useChatInbox(30000);
+  const inboxCount = inbox.unread_messages + inbox.missed_calls;
   const location = useLocation();
   const navigate = useNavigate();
   const showCallBanner = callPhase !== "idle" && callPhase !== "ended";
@@ -132,6 +135,11 @@ export default function DashboardLayout({ children }) {
                 <span className="truncate">{item.name}</span>
                 {item.href === "/user-chat" && incomingCallerId ? (
                   <span className="ml-auto inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-500" />
+                ) : null}
+                {item.href === "/user-chat" && !incomingCallerId && inboxCount > 0 ? (
+                  <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-white">
+                    {inboxCount > 99 ? "99+" : inboxCount}
+                  </span>
                 ) : null}
               </Link>
             );
