@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   ArrowPathIcon,
   CameraIcon,
@@ -13,6 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
 import FaceScanGuide from "../components/FaceScanGuide";
+import SecurityPanel from "../components/SecurityPanel";
 import UserAvatar from "../components/UserAvatar";
 import useFaceFollowCamera from "../hooks/useFaceFollowCamera";
 import api, { getApiError, saveSession } from "../services/api";
@@ -21,6 +22,8 @@ import { canvasToJpegBlob, captureFollowedFace } from "../utils/faceCapture";
 import { formatDate, titleize } from "../utils/formatters";
 
 export default function Profile() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") === "security" ? "security" : "profile";
   const [user, setUser] = useState(null);
   const [capturedImage, setCapturedImage] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -187,7 +190,7 @@ export default function Profile() {
           </div>
         </section>
 
-        {(message || error) && (
+        {(message || error) && activeTab === "profile" && (
           <div
             className={`rounded-lg border p-4 text-sm font-semibold ${
               error
@@ -199,6 +202,36 @@ export default function Profile() {
           </div>
         )}
 
+        <div className="flex gap-2 border-b border-slate-200">
+          <button
+            type="button"
+            onClick={() => setSearchParams({})}
+            className={`inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition ${
+              activeTab === "profile"
+                ? "border-primary text-primary"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <UserCircleIcon className="h-5 w-5" />
+            Profile
+          </button>
+          <button
+            type="button"
+            onClick={() => setSearchParams({ tab: "security" })}
+            className={`inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition ${
+              activeTab === "security"
+                ? "border-primary text-primary"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <KeyIcon className="h-5 w-5" />
+            Security
+          </button>
+        </div>
+
+        {activeTab === "security" ? (
+          <SecurityPanel />
+        ) : (
         <section className="grid gap-6 xl:grid-cols-[1fr_0.75fr]">
           <div className="card">
             <div className="mb-5 flex items-center justify-between gap-3">
@@ -299,26 +332,9 @@ export default function Profile() {
               value={user?.id || "Not available"}
               detail={user?.created_at ? `Created ${formatDate(user.created_at)}` : "Account record"}
             />
-            <div className="card">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-white">
-                  <KeyIcon className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-500">Password</p>
-                  <p className="truncate text-xl font-bold text-slate-950">Account Security</p>
-                </div>
-              </div>
-              <p className="mt-4 text-sm text-slate-500">
-                Update your password or use the forgot-password SNS reset flow from sign in.
-              </p>
-              <Link to="/update-password" className="btn btn-primary mt-4 inline-flex w-full items-center justify-center gap-2">
-                <KeyIcon className="h-5 w-5" />
-                Update Password
-              </Link>
-            </div>
           </div>
         </section>
+        )}
       </div>
     </DashboardLayout>
   );

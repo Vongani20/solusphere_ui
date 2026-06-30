@@ -523,9 +523,9 @@ export default function CVBuilder() {
         <div className={`rounded-lg border border-slate-200 bg-white p-4 shadow-sm ${!hasConsent ? "opacity-60" : ""}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-bold text-heading">Import from PDF</p>
+              <p className="text-xs font-bold text-heading">Extract from PDF</p>
               <p className="mt-0.5 text-[9px] text-muted">
-                AI reads your CV and fills the wizard. Review every field before saving.
+                Extract your CV from a PDF and fill the wizard. Review every field before saving.
               </p>
               {!hasConsent && !consentLoading && (
                 <p className="mt-2 text-[10px] font-semibold text-amber-800">Sign consent above to enable import.</p>
@@ -539,7 +539,7 @@ export default function CVBuilder() {
               }`}
             >
               <DocumentArrowUpIcon className="h-4 w-4" />
-              {importingCv ? "Importing..." : "Upload CV (PDF)"}
+              {importingCv ? "Extracting..." : "Extract PDF"}
               <input
                 key={cvFileInputKey}
                 type="file"

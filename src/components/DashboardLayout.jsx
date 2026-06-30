@@ -9,7 +9,6 @@ import {
   DocumentChartBarIcon,
   DocumentTextIcon,
   HomeIcon,
-  KeyIcon,
   ShieldCheckIcon,
   TicketIcon,
   UserGroupIcon,
@@ -23,8 +22,7 @@ import UserAvatar from "./UserAvatar";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
-  { name: "Profile", href: "/profile", icon: UserCircleIcon },
-  { name: "Security", href: "/update-password", icon: KeyIcon },
+  { name: "Profile & Security", href: "/profile", icon: UserCircleIcon },
   { name: "Events", href: "/events", icon: CalendarDaysIcon },
   { name: "User Chat", href: "/user-chat", icon: UserGroupIcon },
   { name: "Help Desk", href: "/helpdesk", icon: TicketIcon },
@@ -70,7 +68,10 @@ export default function DashboardLayout({ children }) {
   const currentPage = useMemo(() => {
     return (
       visibleNavigation.find((item) => {
-        if (item.href === "/dashboard") return location.pathname === item.href;
+            if (item.href === "/dashboard") return location.pathname === item.href;
+        if (item.href === "/profile") {
+          return location.pathname === "/profile" || location.pathname === "/update-password";
+        }
         return location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
       })?.name || "SoluSphere"
     );
