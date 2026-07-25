@@ -257,20 +257,27 @@ export default function Admin() {
     }
   };
 
-  const downloadCvPdf = async (userId, name) => {
-    setDownloadingCvId(userId);
+  const downloadCvFile = async (userId, name, format = "pdf") => {
+    const isWord = format === "word";
+    setDownloadingCvId(`${userId}:${format}`);
     try {
-      const res = await api.get(`/admin/cvs/${userId}/download`, { responseType: "blob" });
-      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const res = await api.get(`/admin/cvs/${userId}/download`, {
+        responseType: "blob",
+        params: isWord ? { format: "word" } : undefined,
+      });
+      const mime = isWord
+        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        : "application/pdf";
+      const url = URL.createObjectURL(new Blob([res.data], { type: mime }));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${name || "cv"}.pdf`;
+      a.download = `${name || "cv"}.${isWord ? "docx" : "pdf"}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      showError(err, "PDF download failed.");
+      showError(err, `${isWord ? "Word" : "PDF"} download failed.`);
     } finally {
       setDownloadingCvId(null);
     }
@@ -1164,12 +1171,21 @@ export default function Admin() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => downloadCvPdf(cv.user_id, `${cv.first_name}_${cv.last_name}`)}
-                                disabled={downloadingCvId === cv.user_id}
+                                onClick={() => downloadCvFile(cv.user_id, `${cv.first_name}_${cv.last_name}`, "pdf")}
+                                disabled={downloadingCvId === `${cv.user_id}:pdf`}
                                 className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition"
                               >
                                 <ArrowDownTrayIcon className="h-3.5 w-3.5" />
-                                {downloadingCvId === cv.user_id ? "…" : "PDF"}
+                                {downloadingCvId === `${cv.user_id}:pdf` ? "…" : "PDF"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => downloadCvFile(cv.user_id, `${cv.first_name}_${cv.last_name}`, "word")}
+                                disabled={downloadingCvId === `${cv.user_id}:word`}
+                                className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-teal-700 text-white hover:bg-teal-600 disabled:opacity-50 transition"
+                              >
+                                <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                                {downloadingCvId === `${cv.user_id}:word` ? "…" : "Word"}
                               </button>
                             </div>
                           </td>
@@ -1209,12 +1225,21 @@ export default function Admin() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => downloadCvPdf(selectedCv.user_id, `${selectedCv.first_name}_${selectedCv.last_name}`)}
-                      disabled={downloadingCvId === selectedCv.user_id}
+                      onClick={() => downloadCvFile(selectedCv.user_id, `${selectedCv.first_name}_${selectedCv.last_name}`, "pdf")}
+                      disabled={downloadingCvId === `${selectedCv.user_id}:pdf`}
                       className="btn btn-primary inline-flex items-center gap-2 disabled:opacity-50"
                     >
                       <ArrowDownTrayIcon className="h-4 w-4" />
-                      {downloadingCvId === selectedCv.user_id ? "Downloading…" : "Download PDF"}
+                      {downloadingCvId === `${selectedCv.user_id}:pdf` ? "Downloading…" : "Download PDF"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadCvFile(selectedCv.user_id, `${selectedCv.first_name}_${selectedCv.last_name}`, "word")}
+                      disabled={downloadingCvId === `${selectedCv.user_id}:word`}
+                      className="btn btn-secondary inline-flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      {downloadingCvId === `${selectedCv.user_id}:word` ? "Downloading…" : "Download Word"}
                     </button>
                     <button
                       type="button"

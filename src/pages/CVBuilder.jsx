@@ -392,7 +392,7 @@ export default function CVBuilder() {
     } catch (err) {
       const { message, faceRequired: needsFace, consentRequired } = cvApiError(
         err,
-        "Could not import CV. Upload a text-based PDF and try again."
+        "Could not import CV. Upload a text-based PDF or Word (.docx) and try again."
       );
       setError(message);
       setFaceRequired(needsFace);
@@ -463,16 +463,23 @@ export default function CVBuilder() {
     }
   };
 
-  const downloadPDF = async () => {
-    setDownloading(true);
+  const downloadCV = async (format = "pdf") => {
+    const isWord = format === "word";
+    setDownloading(format);
     setError("");
     setFaceRequired(false);
     try {
-      const res = await api.get("/cv/download", { responseType: "blob" });
-      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const res = await api.get("/cv/download", {
+        responseType: "blob",
+        params: isWord ? { format: "word" } : undefined,
+      });
+      const mime = isWord
+        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        : "application/pdf";
+      const url = URL.createObjectURL(new Blob([res.data], { type: mime }));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `CV_${form.first_name}_${form.last_name}.pdf`;
+      a.download = `CV_${form.first_name}_${form.last_name}.${isWord ? "docx" : "pdf"}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -480,7 +487,7 @@ export default function CVBuilder() {
     } catch (err) {
       const { message, faceRequired: needsFace } = cvApiError(
         err,
-        "PDF download failed. Make sure your CV is saved first."
+        `${isWord ? "Word" : "PDF"} download failed. Make sure your CV is saved first.`
       );
       setError(message);
       setFaceRequired(needsFace);
@@ -507,7 +514,7 @@ export default function CVBuilder() {
         <div>
           <h1 className="text-sm font-bold text-heading">CV Builder</h1>
           <p className="mt-0.5 text-[9px] font-medium text-muted">
-            Upload an existing CV PDF to pre-fill the form, or build your branded SoluGrowth CV step by step
+            Upload an existing CV (PDF or Word) to pre-fill the form, or build your branded SoluGrowth CV step by step
           </p>
         </div>
 
@@ -517,15 +524,15 @@ export default function CVBuilder() {
           consents={consents}
           onSignClick={openConsentModal}
           title="CV Builder consent required"
-          description="You must sign consent before saving your CV, importing a PDF, or uploading a profile photo."
+          description="You must sign consent before saving your CV, importing a PDF or Word document, or uploading a profile photo."
         />
 
         <div className={`rounded-lg border border-slate-200 bg-white p-4 shadow-sm ${!hasConsent ? "opacity-60" : ""}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-bold text-heading">Extract from PDF</p>
+              <p className="text-xs font-bold text-heading">Extract from PDF or Word</p>
               <p className="mt-0.5 text-[9px] text-muted">
-                Extract your CV from a PDF and fill the wizard. Review every field before saving.
+                Upload a PDF or Word (.docx) CV to pre-fill the wizard. Review every field before saving.
               </p>
               {!hasConsent && !consentLoading && (
                 <p className="mt-2 text-[10px] font-semibold text-amber-800">Sign consent above to enable import.</p>
@@ -539,11 +546,11 @@ export default function CVBuilder() {
               }`}
             >
               <DocumentArrowUpIcon className="h-4 w-4" />
-              {importingCv ? "Extracting..." : "Extract PDF"}
+              {importingCv ? "Extracting..." : "Upload CV"}
               <input
                 key={cvFileInputKey}
                 type="file"
-                accept="application/pdf,.pdf"
+                accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
                 className="hidden"
                 disabled={importingCv || !hasConsent}
                 onChange={importCvDocument}
@@ -639,7 +646,7 @@ export default function CVBuilder() {
             downloading={downloading}
             onUploadPhoto={uploadPhoto}
             onSave={() => saveAndNext(null)}
-            onDownload={downloadPDF}
+            onDownload={downloadCV}
             onBack={() => setStep(3)}
           />
         )}
@@ -1179,7 +1186,7 @@ function Step4({
           <div className="card space-y-4">
             <SectionHeader title="Save & Download" />
             <p className="text-sm text-slate-600">
-              Save your CV data, then download it as a branded SoluGrowth PDF.
+              Save your CV data, then download it as a branded SoluGrowth PDF or Word document.
             </p>
             <button
               className="btn btn-secondary w-full"
@@ -1190,11 +1197,19 @@ function Step4({
             </button>
             <button
               className="btn btn-primary inline-flex w-full items-center justify-center gap-2"
-              onClick={onDownload}
-              disabled={downloading}
+              onClick={() => onDownload("pdf")}
+              disabled={!!downloading}
             >
               <ArrowDownTrayIcon className="h-5 w-5" />
-              {downloading ? "Generating PDF…" : "Download PDF"}
+              {downloading === "pdf" ? "Generating PDF…" : "Download PDF"}
+            </button>
+            <button
+              className="btn btn-secondary inline-flex w-full items-center justify-center gap-2"
+              onClick={() => onDownload("word")}
+              disabled={!!downloading}
+            >
+              <ArrowDownTrayIcon className="h-5 w-5" />
+              {downloading === "word" ? "Generating Word…" : "Download Word"}
             </button>
           </div>
         </div>
