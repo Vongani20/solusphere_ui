@@ -60,13 +60,18 @@ export function getApiError(error, fallback = "Something went wrong.") {
   }
 
   const status = error?.response?.status;
-  if (status === 403) {
-    return "Upload blocked by the server (403). Try password login, hard-refresh, or contact support if this continues.";
-  }
-
   const data = error?.response?.data;
   const errorText = typeof data?.error === "string" ? data.error.trim() : "";
   const detailsText = typeof data?.details === "string" ? data.details.trim() : "";
+
+  if (status === 403) {
+    if (errorText && detailsText && errorText !== detailsText) {
+      return `${errorText}: ${detailsText}`;
+    }
+    if (errorText) return errorText;
+    if (typeof data?.message === "string" && data.message.trim()) return data.message.trim();
+    return "Upload blocked by the server (403). Try password login, hard-refresh, or contact support if this continues.";
+  }
 
   if (errorText && detailsText && errorText !== detailsText) {
     return `${errorText}: ${detailsText}`;
