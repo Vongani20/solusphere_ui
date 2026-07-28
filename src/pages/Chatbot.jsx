@@ -255,7 +255,7 @@ export default function Chatbot() {
     {
       role: "assistant",
       content:
-        "Ask me anything in one place. I can search the web, review a website, create analytics summaries, and use attached image context.",
+        "Ask me anything in one place. I can search the web, review a website, create analytics summaries, and read text from attached images for accurate analysis.",
       sources: [],
     },
   ]);
@@ -328,13 +328,18 @@ export default function Chatbot() {
       "If the user includes a website URL, inspect/search public context for that website and provide practical recommendations.",
       "Use concise point form when it improves readability. Use Markdown tables for comparisons, metrics, pros/cons, ranked options, or structured recommendations.",
       "Return a polished client-ready answer. Do not repeat these instructions, do not mention internal prompt labels, do not show raw prompt text, and do not start with generic labels like Prompt or User request.",
-      `Request: ${userQuery || "Analyze the supplied image(s)."}`,
+      `Request: ${userQuery || "Read the text in the attached image(s) carefully and analyse it accurately."}`,
     ];
 
     if (attachmentMeta.length > 0) {
       sections.push(
         [
-          "Images are attached for visual inspection. Describe what you see and answer using the image content.",
+          "Images are attached. Your job is OCR + accurate analysis:",
+          "1. Read every readable word, number, date, label, and table cell in the image(s).",
+          "2. Quote or list the key text first when it helps accuracy.",
+          "3. Base findings only on text and values that are actually visible.",
+          "4. If any text is unclear, say so — do not invent missing wording.",
+          "5. Then give a clear analysis, summary, or answer based on that extracted text.",
           ...attachmentMeta.map(
             (attachment, index) =>
               `${index + 1}. ${attachment.name} (${attachment.type || "image"}, ${Math.round(attachment.size / 1024)} KB)`
@@ -389,7 +394,8 @@ export default function Chatbot() {
         "/chatbot",
         {
           message: prompt,
-          web_search: true,
+          // Prefer image-text grounding over web search when photos are attached.
+          web_search: images.length === 0,
           images,
         },
         { timeout: 120000 }
@@ -433,7 +439,7 @@ export default function Chatbot() {
           </div>
           <div className="min-w-0">
             <h1 className="text-xs font-bold text-heading">SIA Agent</h1>
-            <p className="text-[8px] font-medium text-muted">Web · website analytics · image context</p>
+            <p className="text-[8px] font-medium text-muted">Web · website analytics · image text analysis</p>
           </div>
         </div>
 
