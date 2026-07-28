@@ -54,13 +54,22 @@ const normalizeSkills = (skills) => {
   }));
 };
 
+const normalizePeriodValue = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^(present|current|now|ongoing)$/i.test(raw)) return "Present";
+  const yearMonth = /^(\d{4})-(\d{2})/.exec(raw);
+  if (yearMonth) return `${yearMonth[1]}-${yearMonth[2]}`;
+  return raw;
+};
+
 const normalizeExperienceList = (experience) => {
   if (!Array.isArray(experience) || !experience.length) return [emptyExperience()];
   return experience.map((exp) => ({
     company: exp?.company ?? "",
     position: exp?.position ?? "",
-    period_start: exp?.period_start ?? "",
-    period_end: exp?.period_end ?? "",
+    period_start: normalizePeriodValue(exp?.period_start),
+    period_end: normalizePeriodValue(exp?.period_end),
     scope_of_work:
       Array.isArray(exp?.scope_of_work) && exp.scope_of_work.length
         ? exp.scope_of_work
@@ -81,6 +90,257 @@ const FORM_STRING_FIELDS = [
 
 const FACE_REQUIRED_MESSAGE =
   "Register your face in Profile before using the CV Builder.";
+
+const MONTH_OPTIONS = [
+  { value: "01", label: "January" },
+  { value: "02", label: "February" },
+  { value: "03", label: "March" },
+  { value: "04", label: "April" },
+  { value: "05", label: "May" },
+  { value: "06", label: "June" },
+  { value: "07", label: "July" },
+  { value: "08", label: "August" },
+  { value: "09", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
+const DOB_YEAR_START = 1930;
+
+const monthLabel = (month) => MONTH_OPTIONS.find((m) => m.value === month)?.label || "";
+
+const splitISODate = (value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || "").trim());
+  if (!match) return { year: "", month: "", day: "" };
+  return { year: match[1], month: match[2], day: match[3] };
+};
+
+const joinISODate = (year, month, day) => {
+  if (!year || !month || !day) return "";
+  return `${year}-${month}-${day}`;
+};
+
+const splitYearMonth = (value) => {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(value || "").trim());
+  if (!match) return { year: "", month: "" };
+  return { year: match[1], month: match[2] };
+};
+
+const joinYearMonth = (year, month) => {
+  if (!year || !month) return "";
+  return `${year}-${month}`;
+};
+
+const daysInMonth = (year, month) => {
+  if (!year || !month) return 31;
+  return new Date(Number(year), Number(month), 0).getDate();
+};
+
+const yearOptionsDescending = (startYear, endYear) => {
+  const years = [];
+  for (let year = endYear; year >= startYear; year -= 1) {
+    years.push(String(year));
+  }
+  return years;
+};
+
+const decadeGroups = (years) => {
+  const groups = [];
+  for (const year of years) {
+    const decadeStart = Math.floor(Number(year) / 10) * 10;
+    const label = `${decadeStart}s`;
+    const last = groups[groups.length - 1];
+    if (!last || last.label !== label) {
+      groups.push({ label, years: [year] });
+    } else {
+      last.years.push(year);
+    }
+  }
+  return groups;
+};
+
+const formatFriendlyDate = (value) => {
+  const { year, month, day } = splitISODate(value);
+  if (!year || !month || !day) return "";
+  return `${Number(day)} ${monthLabel(month)} ${year}`;
+};
+
+const formatFriendlyMonthYear = (value) => {
+  const { year, month } = splitYearMonth(value);
+  if (!year || !month) return "";
+  return `${monthLabel(month)} ${year}`;
+};
+
+function DateOfBirthSelects({ value, onChange, hasError }) {
+  const { year, month, day } = splitISODate(value);
+  const currentYear = new Date().getFullYear();
+  const years = yearOptionsDescending(DOB_YEAR_START, currentYear - 14);
+  const yearGroups = decadeGroups(years);
+  const maxDay = daysInMonth(year, month);
+  const days = Array.from({ length: maxDay }, (_, i) => String(i + 1).padStart(2, "0"));
+  const safeDay = day && Number(day) > maxDay ? "" : day;
+  const friendly = formatFriendlyDate(joinISODate(year, month, safeDay));
+
+  const updatePart = (part, nextValue) => {
+    const next = { year, month, day: safeDay, [part]: nextValue };
+    if (part !== "day") {
+      const nextMax = daysInMonth(next.year, next.month);
+      if (next.day && Number(next.day) > nextMax) next.day = "";
+    }
+    onChange(joinISODate(next.year, next.month, next.day));
+  };
+
+  const selectClass = `input ${hasError ? "input-error" : ""}`;
+
+  return (
+    <div className="mt-1 space-y-2">
+      <p className="text-[10px] text-slate-400">Choose day, month, then year — no scrolling through a calendar.</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Day</span>
+          <select
+            className={selectClass}
+            value={safeDay}
+            onChange={(e) => updatePart("day", e.target.value)}
+            aria-label="Day of birth"
+          >
+            <option value="">Select day</option>
+            {days.map((d) => (
+              <option key={d} value={d}>
+                {Number(d)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Month</span>
+          <select
+            className={selectClass}
+            value={month}
+            onChange={(e) => updatePart("month", e.target.value)}
+            aria-label="Month of birth"
+          >
+            <option value="">Select month</option>
+            {MONTH_OPTIONS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Year</span>
+          <select
+            className={selectClass}
+            value={year}
+            onChange={(e) => updatePart("year", e.target.value)}
+            aria-label="Year of birth"
+          >
+            <option value="">Select year</option>
+            {yearGroups.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      </div>
+      {friendly ? (
+        <p className="text-[11px] font-medium text-slate-600">Selected: {friendly}</p>
+      ) : (
+        <p className="text-[11px] text-slate-400">Example: 15 March 1992</p>
+      )}
+    </div>
+  );
+}
+
+function MonthYearSelects({
+  value,
+  onChange,
+  endYearOffset = 5,
+  startYear = 1970,
+  emptyLabel = "Select",
+  allowPresent = false,
+  presentLabel = "Present (current role)",
+}) {
+  const isPresent = allowPresent && value === "Present";
+  const { year, month } = isPresent ? { year: "", month: "" } : splitYearMonth(value);
+  const currentYear = new Date().getFullYear();
+  const years = yearOptionsDescending(startYear, currentYear + endYearOffset);
+  const yearGroups = decadeGroups(years);
+  const friendly = isPresent ? "Present" : formatFriendlyMonthYear(value);
+
+  const updatePart = (part, nextValue) => {
+    const next = { year, month, [part]: nextValue };
+    onChange(joinYearMonth(next.year, next.month));
+  };
+
+  return (
+    <div className="mt-1 space-y-2">
+      {allowPresent && (
+        <label className="inline-flex items-center gap-2 text-[11px] font-medium text-slate-600">
+          <input
+            type="checkbox"
+            className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+            checked={isPresent}
+            onChange={(e) => onChange(e.target.checked ? "Present" : "")}
+          />
+          {presentLabel}
+        </label>
+      )}
+      {!isPresent && (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Month</span>
+            <select
+              className="input"
+              value={month}
+              onChange={(e) => updatePart("month", e.target.value)}
+              aria-label={`${emptyLabel} month`}
+            >
+              <option value="">Select month</option>
+              {MONTH_OPTIONS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Year</span>
+            <select
+              className="input"
+              value={year}
+              onChange={(e) => updatePart("year", e.target.value)}
+              aria-label={`${emptyLabel} year`}
+            >
+              <option value="">Select year</option>
+              {yearGroups.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.years.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+      {friendly ? (
+        <p className="text-[11px] font-medium text-slate-600">{friendly}</p>
+      ) : (
+        <p className="text-[11px] text-slate-400">Example: March 2020</p>
+      )}
+    </div>
+  );
+}
 
 const cleanStringList = (items) =>
   (items ?? []).map((item) => String(item).trim()).filter(Boolean);
@@ -724,11 +984,15 @@ function Step1({ form, setForm, fieldErrors, saving, onNext }) {
         </label>
         <label className="block">
           <FieldLabel text="Date of Birth" required />
-          <input
-            type="date"
-            className={`input mt-1 ${fieldErrors.date_of_birth ? "input-error" : ""}`}
+          <DateOfBirthSelects
             value={form.date_of_birth}
-            onChange={set("date_of_birth")}
+            hasError={Boolean(fieldErrors.date_of_birth)}
+            onChange={(next) =>
+              setForm((prev) => ({
+                ...prev,
+                date_of_birth: next,
+              }))
+            }
           />
           <FieldError errors={fieldErrors} field="date_of_birth" />
         </label>
@@ -736,7 +1000,7 @@ function Step1({ form, setForm, fieldErrors, saving, onNext }) {
 
       <label className="block">
         <FieldLabel text="Profile Summary" required />
-        <p className="mb-1 text-xs text-slate-400">A short professional bio (max ~80 words).</p>
+        <p className="mb-1 text-xs text-slate-400">Your professional bio / profile summary.</p>
         <textarea
           rows={4}
           className={`input mt-1 ${fieldErrors.profile_text ? "input-error" : ""}`}
@@ -749,7 +1013,7 @@ function Step1({ form, setForm, fieldErrors, saving, onNext }) {
 
       <label className="block">
         <FieldLabel text="Value Proposition" required />
-        <p className="mb-1 text-xs text-slate-400">What unique value do you bring? (max ~150 words).</p>
+        <p className="mb-1 text-xs text-slate-400">What unique value do you bring?</p>
         <textarea
           rows={5}
           className={`input mt-1 ${fieldErrors.value_proposition ? "input-error" : ""}`}
@@ -979,21 +1243,20 @@ function Step3({
             </label>
             <label className="block">
               <FieldLabel text="Period Start" />
-              <input
-                type="month"
-                className="input mt-1"
+              <MonthYearSelects
                 value={exp.period_start}
-                onChange={(e) => updateExperience(ei, "period_start", e.target.value)}
+                emptyLabel="Period start"
+                onChange={(next) => updateExperience(ei, "period_start", next)}
               />
             </label>
             <label className="block">
               <FieldLabel text="Period End" />
-              <input
-                type="month"
-                className="input mt-1"
+              <MonthYearSelects
                 value={exp.period_end}
-                onChange={(e) => updateExperience(ei, "period_end", e.target.value)}
-                placeholder="Leave blank if current"
+                emptyLabel="Period end"
+                allowPresent
+                presentLabel="I currently work here"
+                onChange={(next) => updateExperience(ei, "period_end", next)}
               />
             </label>
           </div>
@@ -1076,7 +1339,10 @@ function Step4({
               <ReviewField label="Name" value={`${form.first_name} ${form.last_name}`} />
               <ReviewField label="Gender" value={form.gender} />
               <ReviewField label="Nationality" value={form.nationality} />
-              <ReviewField label="Date of Birth" value={form.date_of_birth} />
+              <ReviewField
+                label="Date of Birth"
+                value={formatFriendlyDate(form.date_of_birth) || form.date_of_birth}
+              />
             </dl>
             {form.profile_text && (
               <div className="mt-3">
@@ -1136,7 +1402,10 @@ function Step4({
                 <p className="text-sm text-slate-600">{exp.position}</p>
                 {(exp.period_start || exp.period_end) && (
                   <p className="text-xs text-slate-400">
-                    {exp.period_start} – {exp.period_end || "Present"}
+                    {formatFriendlyMonthYear(exp.period_start) || exp.period_start || "—"} –{" "}
+                    {exp.period_end === "Present" || !exp.period_end
+                      ? "Present"
+                      : formatFriendlyMonthYear(exp.period_end) || exp.period_end}
                   </p>
                 )}
                 {(exp.scope_of_work ?? []).filter(Boolean).length > 0 && (

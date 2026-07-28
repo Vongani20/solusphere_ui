@@ -291,6 +291,7 @@ export default function Chatbot() {
       name: file.name,
       size: file.size,
       type: file.type,
+      file,
       previewUrl: URL.createObjectURL(file),
     }));
 
@@ -311,7 +312,15 @@ export default function Chatbot() {
     setAttachments([]);
   };
 
-  const buildAgentPrompt = (userQuery) => {
+  const fileToDataURL = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error(`Could not read ${file?.name || "image"}`));
+      reader.readAsDataURL(file);
+    });
+
+  const buildAgentPrompt = (userQuery, attachmentMeta) => {
     const sections = [
       "You are SIA, SoluSphere's agent. Use web search when current information, websites, companies, products, policies, or public facts may matter.",
       "Format every reply like a polished article inside the app: a specific title when useful, short paragraphs, spacious point-form bullets, and clean Markdown tables only when structured data is clearer than prose.",
@@ -319,18 +328,17 @@ export default function Chatbot() {
       "If the user includes a website URL, inspect/search public context for that website and provide practical recommendations.",
       "Use concise point form when it improves readability. Use Markdown tables for comparisons, metrics, pros/cons, ranked options, or structured recommendations.",
       "Return a polished client-ready answer. Do not repeat these instructions, do not mention internal prompt labels, do not show raw prompt text, and do not start with generic labels like Prompt or User request.",
-      `Request: ${userQuery || "Analyze the supplied image context."}`,
+      `Request: ${userQuery || "Analyze the supplied image(s)."}`,
     ];
 
-    if (attachments.length > 0) {
+    if (attachmentMeta.length > 0) {
       sections.push(
         [
-          "Images attached in the UI:",
-          ...attachments.map(
+          "Images are attached for visual inspection. Describe what you see and answer using the image content.",
+          ...attachmentMeta.map(
             (attachment, index) =>
               `${index + 1}. ${attachment.name} (${attachment.type || "image"}, ${Math.round(attachment.size / 1024)} KB)`
           ),
-          "If server-side vision is not enabled, be clear that image visual inspection needs the image-capable backend endpoint and use the user's text plus filenames as context.",
         ].join("\n")
       );
     }
@@ -343,14 +351,15 @@ export default function Chatbot() {
     if (!hasContent || loading) return;
 
     const userQuery = query.trim();
-    const prompt = buildAgentPrompt(userQuery);
-    const messageAttachments = attachments.map(({ id, name, type, size, previewUrl }) => ({
+    const currentAttachments = [...attachments];
+    const messageAttachments = currentAttachments.map(({ id, name, type, size, previewUrl }) => ({
       id,
       name,
       type,
       size,
       previewUrl,
     }));
+    const prompt = buildAgentPrompt(userQuery, messageAttachments);
 
     setQuery("");
     setMessages((items) => [
@@ -364,10 +373,27 @@ export default function Chatbot() {
     setLoading(true);
 
     try {
-      const res = await api.post("/chatbot", {
-        message: prompt,
-        web_search: true,
-      });
+      const oversized = currentAttachments.find((attachment) => attachment.size > 3 * 1024 * 1024);
+      if (oversized) {
+        throw new Error(`Image "${oversized.name}" is too large. Please use images under 3 MB.`);
+      }
+
+      const images = await Promise.all(
+        currentAttachments.map(async (attachment) => ({
+          name: attachment.name,
+          data_url: await fileToDataURL(attachment.file),
+        }))
+      );
+
+      const res = await api.post(
+        "/chatbot",
+        {
+          message: prompt,
+          web_search: true,
+          images,
+        },
+        { timeout: 120000 }
+      );
 
       setMessages((items) => [
         ...items,
@@ -386,7 +412,9 @@ export default function Chatbot() {
         ...items,
         {
           role: "assistant",
-          content: getApiError(err, "SIA could not process that request."),
+          content: err?.message?.includes("too large")
+            ? err.message
+            : getApiError(err, "SIA could not process that request."),
           sources: [],
         },
       ]);
