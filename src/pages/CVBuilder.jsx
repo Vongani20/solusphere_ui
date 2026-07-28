@@ -54,59 +54,28 @@ const normalizeSkills = (skills) => {
   }));
 };
 
-const normalizePeriodValue = (value) => {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-  if (/^(present|current|now|ongoing)$/i.test(raw)) return "Present";
-  const yearMonth = /^(\d{4})-(\d{2})/.exec(raw);
-  if (yearMonth) return `${yearMonth[1]}-${yearMonth[2]}`;
-  return raw;
-};
-
-const normalizeExperienceList = (experience) => {
-  if (!Array.isArray(experience) || !experience.length) return [emptyExperience()];
-  return experience.map((exp) => ({
-    company: exp?.company ?? "",
-    position: exp?.position ?? "",
-    period_start: normalizePeriodValue(exp?.period_start),
-    period_end: normalizePeriodValue(exp?.period_end),
-    scope_of_work:
-      Array.isArray(exp?.scope_of_work) && exp.scope_of_work.length
-        ? exp.scope_of_work
-        : [""],
-  }));
-};
-
-const FORM_STRING_FIELDS = [
-  "first_name",
-  "last_name",
-  "profile_photo_url",
-  "profile_text",
-  "value_proposition",
-  "gender",
-  "nationality",
-  "date_of_birth",
-];
-
-const FACE_REQUIRED_MESSAGE =
-  "Register your face in Profile before using the CV Builder.";
-
 const MONTH_OPTIONS = [
-  { value: "01", label: "January" },
-  { value: "02", label: "February" },
-  { value: "03", label: "March" },
-  { value: "04", label: "April" },
-  { value: "05", label: "May" },
-  { value: "06", label: "June" },
-  { value: "07", label: "July" },
-  { value: "08", label: "August" },
-  { value: "09", label: "September" },
-  { value: "10", label: "October" },
-  { value: "11", label: "November" },
-  { value: "12", label: "December" },
+  { value: "01", label: "January", short: "Jan" },
+  { value: "02", label: "February", short: "Feb" },
+  { value: "03", label: "March", short: "Mar" },
+  { value: "04", label: "April", short: "Apr" },
+  { value: "05", label: "May", short: "May" },
+  { value: "06", label: "June", short: "Jun" },
+  { value: "07", label: "July", short: "Jul" },
+  { value: "08", label: "August", short: "Aug" },
+  { value: "09", label: "September", short: "Sep" },
+  { value: "10", label: "October", short: "Oct" },
+  { value: "11", label: "November", short: "Nov" },
+  { value: "12", label: "December", short: "Dec" },
 ];
 
 const DOB_YEAR_START = 1930;
+const MONTH_NAME_TO_VALUE = MONTH_OPTIONS.reduce((acc, month) => {
+  acc[month.label.toLowerCase()] = month.value;
+  acc[month.short.toLowerCase()] = month.value;
+  if (month.short === "Sep") acc.sept = month.value;
+  return acc;
+}, {});
 
 const monthLabel = (month) => MONTH_OPTIONS.find((m) => m.value === month)?.label || "";
 
@@ -172,31 +141,106 @@ const formatFriendlyMonthYear = (value) => {
   return `${monthLabel(month)} ${year}`;
 };
 
+const normalizePeriodValue = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^(present|current|now|ongoing)$/i.test(raw)) return "Present";
+
+  const iso = /^(\d{4})-(\d{2})(?:-\d{2})?/.exec(raw);
+  if (iso) return `${iso[1]}-${iso[2]}`;
+
+  const slash = /^(\d{1,2})[/-](\d{4})$/.exec(raw);
+  if (slash) {
+    const month = String(slash[1]).padStart(2, "0");
+    if (Number(month) >= 1 && Number(month) <= 12) return `${slash[2]}-${month}`;
+  }
+
+  const named = raw.match(/^([A-Za-z]+)\.?\s+(\d{4})$/);
+  if (named) {
+    const month = MONTH_NAME_TO_VALUE[named[1].toLowerCase()];
+    if (month) return `${named[2]}-${month}`;
+  }
+
+  const namedReverse = raw.match(/^(\d{4})\s+([A-Za-z]+)\.?$/);
+  if (namedReverse) {
+    const month = MONTH_NAME_TO_VALUE[namedReverse[2].toLowerCase()];
+    if (month) return `${namedReverse[1]}-${month}`;
+  }
+
+  return raw;
+};
+
+
+const FACE_REQUIRED_MESSAGE =
+  "Register your face in Profile before using the CV Builder.";
+
+const FORM_STRING_FIELDS = [
+  "first_name",
+  "last_name",
+  "profile_photo_url",
+  "profile_text",
+  "value_proposition",
+  "gender",
+  "nationality",
+  "date_of_birth",
+];
+
+const normalizeExperienceList = (experience) => {
+  if (!Array.isArray(experience) || !experience.length) return [emptyExperience()];
+  return experience.map((exp) => ({
+    company: exp?.company ?? "",
+    position: exp?.position ?? "",
+    period_start: normalizePeriodValue(exp?.period_start),
+    period_end: normalizePeriodValue(exp?.period_end),
+    scope_of_work:
+      Array.isArray(exp?.scope_of_work) && exp.scope_of_work.length
+        ? exp.scope_of_work
+        : [""],
+  }));
+};
+
 function DateOfBirthSelects({ value, onChange, hasError }) {
-  const { year, month, day } = splitISODate(value);
+  const parsed = splitISODate(value);
+  const [draft, setDraft] = useState(parsed);
   const currentYear = new Date().getFullYear();
   const years = yearOptionsDescending(DOB_YEAR_START, currentYear - 14);
   const yearGroups = decadeGroups(years);
-  const maxDay = daysInMonth(year, month);
+  const maxDay = daysInMonth(draft.year, draft.month);
   const days = Array.from({ length: maxDay }, (_, i) => String(i + 1).padStart(2, "0"));
-  const safeDay = day && Number(day) > maxDay ? "" : day;
-  const friendly = formatFriendlyDate(joinISODate(year, month, safeDay));
+  const safeDay = draft.day && Number(draft.day) > maxDay ? "" : draft.day;
+  const friendly = formatFriendlyDate(joinISODate(draft.year, draft.month, safeDay));
+
+  useEffect(() => {
+    const next = splitISODate(value);
+    setDraft((prev) => {
+      if (prev.year === next.year && prev.month === next.month && prev.day === next.day) {
+        return prev;
+      }
+      if (!next.year && !next.month && !next.day && (prev.year || prev.month || prev.day)) {
+        return prev;
+      }
+      return next;
+    });
+  }, [value]);
 
   const updatePart = (part, nextValue) => {
-    const next = { year, month, day: safeDay, [part]: nextValue };
-    if (part !== "day") {
-      const nextMax = daysInMonth(next.year, next.month);
-      if (next.day && Number(next.day) > nextMax) next.day = "";
-    }
-    onChange(joinISODate(next.year, next.month, next.day));
+    setDraft((prev) => {
+      const next = { ...prev, [part]: nextValue };
+      if (part !== "day") {
+        const nextMax = daysInMonth(next.year, next.month);
+        if (next.day && Number(next.day) > nextMax) next.day = "";
+      }
+      onChange(joinISODate(next.year, next.month, next.day));
+      return next;
+    });
   };
 
   const selectClass = `input ${hasError ? "input-error" : ""}`;
 
   return (
-    <div className="mt-1 space-y-2">
-      <p className="text-[10px] text-slate-400">Choose day, month, then year — no scrolling through a calendar.</p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+    <div className="mt-1 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <p className="text-[10px] text-slate-500">Pick day, month, and year from the lists below.</p>
+      <div className="grid grid-cols-3 gap-2">
         <label className="block">
           <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Day</span>
           <select
@@ -205,7 +249,7 @@ function DateOfBirthSelects({ value, onChange, hasError }) {
             onChange={(e) => updatePart("day", e.target.value)}
             aria-label="Day of birth"
           >
-            <option value="">Select day</option>
+            <option value="">Day</option>
             {days.map((d) => (
               <option key={d} value={d}>
                 {Number(d)}
@@ -217,11 +261,11 @@ function DateOfBirthSelects({ value, onChange, hasError }) {
           <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Month</span>
           <select
             className={selectClass}
-            value={month}
+            value={draft.month}
             onChange={(e) => updatePart("month", e.target.value)}
             aria-label="Month of birth"
           >
-            <option value="">Select month</option>
+            <option value="">Month</option>
             {MONTH_OPTIONS.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
@@ -233,11 +277,11 @@ function DateOfBirthSelects({ value, onChange, hasError }) {
           <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Year</span>
           <select
             className={selectClass}
-            value={year}
+            value={draft.year}
             onChange={(e) => updatePart("year", e.target.value)}
             aria-label="Year of birth"
           >
-            <option value="">Select year</option>
+            <option value="">Year</option>
             {yearGroups.map((group) => (
               <optgroup key={group.label} label={group.label}>
                 {group.years.map((y) => (
@@ -251,9 +295,9 @@ function DateOfBirthSelects({ value, onChange, hasError }) {
         </label>
       </div>
       {friendly ? (
-        <p className="text-[11px] font-medium text-slate-600">Selected: {friendly}</p>
+        <p className="text-[11px] font-semibold text-emerald-700">Saved as {friendly}</p>
       ) : (
-        <p className="text-[11px] text-slate-400">Example: 15 March 1992</p>
+        <p className="text-[11px] text-slate-400">Choose all three to save the date.</p>
       )}
     </div>
   );
@@ -266,77 +310,113 @@ function MonthYearSelects({
   startYear = 1970,
   emptyLabel = "Select",
   allowPresent = false,
-  presentLabel = "Present (current role)",
+  presentLabel = "I currently work here",
 }) {
   const isPresent = allowPresent && value === "Present";
-  const { year, month } = isPresent ? { year: "", month: "" } : splitYearMonth(value);
+  const parsed = isPresent ? { year: "", month: "" } : splitYearMonth(normalizePeriodValue(value));
+  const [draft, setDraft] = useState(parsed);
   const currentYear = new Date().getFullYear();
   const years = yearOptionsDescending(startYear, currentYear + endYearOffset);
   const yearGroups = decadeGroups(years);
-  const friendly = isPresent ? "Present" : formatFriendlyMonthYear(value);
+  const completeDraft = joinYearMonth(draft.year, draft.month);
+  const friendly = isPresent
+    ? "Present"
+    : formatFriendlyMonthYear(completeDraft) || formatFriendlyMonthYear(normalizePeriodValue(value));
+
+  useEffect(() => {
+    if (value === "Present") {
+      setDraft({ year: "", month: "" });
+      return;
+    }
+    const next = splitYearMonth(normalizePeriodValue(value));
+    setDraft((prev) => {
+      if (prev.year === next.year && prev.month === next.month) return prev;
+      if (!next.year && !next.month && (prev.year || prev.month)) return prev;
+      return next;
+    });
+  }, [value]);
+
+  const commitDraft = (next) => {
+    setDraft(next);
+    const complete = joinYearMonth(next.year, next.month);
+    if (complete) {
+      onChange(complete);
+      return;
+    }
+    if (value && value !== "Present") onChange("");
+  };
 
   const updatePart = (part, nextValue) => {
-    const next = { year, month, [part]: nextValue };
-    onChange(joinYearMonth(next.year, next.month));
+    commitDraft({ ...draft, [part]: nextValue });
   };
 
   return (
-    <div className="mt-1 space-y-2">
+    <div className="mt-1 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
       {allowPresent && (
-        <label className="inline-flex items-center gap-2 text-[11px] font-medium text-slate-600">
+        <label className="inline-flex items-center gap-2 text-[11px] font-medium text-slate-700">
           <input
             type="checkbox"
             className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
             checked={isPresent}
-            onChange={(e) => onChange(e.target.checked ? "Present" : "")}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setDraft({ year: "", month: "" });
+                onChange("Present");
+              } else {
+                onChange("");
+              }
+            }}
           />
           {presentLabel}
         </label>
       )}
       {!isPresent && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Month</span>
-            <select
-              className="input"
-              value={month}
-              onChange={(e) => updatePart("month", e.target.value)}
-              aria-label={`${emptyLabel} month`}
-            >
-              <option value="">Select month</option>
-              {MONTH_OPTIONS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Year</span>
-            <select
-              className="input"
-              value={year}
-              onChange={(e) => updatePart("year", e.target.value)}
-              aria-label={`${emptyLabel} year`}
-            >
-              <option value="">Select year</option>
-              {yearGroups.map((group) => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.years.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-        </div>
+        <>
+          <p className="text-[10px] text-slate-500">Choose month, then year. No calendar scrolling.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Month</span>
+              <select
+                className="input"
+                value={draft.month}
+                onChange={(e) => updatePart("month", e.target.value)}
+                aria-label={`${emptyLabel} month`}
+              >
+                <option value="">Month</option>
+                {MONTH_OPTIONS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Year</span>
+              <select
+                className="input"
+                value={draft.year}
+                onChange={(e) => updatePart("year", e.target.value)}
+                aria-label={`${emptyLabel} year`}
+              >
+                <option value="">Year</option>
+                {yearGroups.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.years.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+          </div>
+        </>
       )}
       {friendly ? (
-        <p className="text-[11px] font-medium text-slate-600">{friendly}</p>
+        <p className="text-[11px] font-semibold text-emerald-700">Saved as {friendly}</p>
       ) : (
-        <p className="text-[11px] text-slate-400">Example: March 2020</p>
+        <p className="text-[11px] text-slate-400">Pick both month and year to save.</p>
       )}
     </div>
   );
@@ -982,7 +1062,7 @@ function Step1({ form, setForm, fieldErrors, saving, onNext }) {
           />
           <FieldError errors={fieldErrors} field="nationality" />
         </label>
-        <label className="block">
+        <div className="block">
           <FieldLabel text="Date of Birth" required />
           <DateOfBirthSelects
             value={form.date_of_birth}
@@ -995,7 +1075,7 @@ function Step1({ form, setForm, fieldErrors, saving, onNext }) {
             }
           />
           <FieldError errors={fieldErrors} field="date_of_birth" />
-        </label>
+        </div>
       </div>
 
       <label className="block">
@@ -1241,15 +1321,15 @@ function Step3({
                 placeholder="Senior Analyst"
               />
             </label>
-            <label className="block">
+            <div className="block">
               <FieldLabel text="Period Start" />
               <MonthYearSelects
                 value={exp.period_start}
                 emptyLabel="Period start"
                 onChange={(next) => updateExperience(ei, "period_start", next)}
               />
-            </label>
-            <label className="block">
+            </div>
+            <div className="block">
               <FieldLabel text="Period End" />
               <MonthYearSelects
                 value={exp.period_end}
@@ -1258,7 +1338,7 @@ function Step3({
                 presentLabel="I currently work here"
                 onChange={(next) => updateExperience(ei, "period_end", next)}
               />
-            </label>
+            </div>
           </div>
 
           <div>
