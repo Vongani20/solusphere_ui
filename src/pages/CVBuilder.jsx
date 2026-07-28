@@ -812,10 +812,25 @@ export default function CVBuilder() {
       const res = await api.get("/cv/download", {
         responseType: "blob",
         params: isWord ? { format: "word" } : undefined,
+        timeout: 120000,
       });
       const mime = isWord
         ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         : "application/pdf";
+      // Guard against JSON error bodies returned with blob responseType.
+      const contentType = String(res.headers?.["content-type"] || "");
+      if (contentType.includes("application/json") || contentType.includes("text/plain")) {
+        const text = await res.data.text();
+        let message = `${isWord ? "Word" : "PDF"} download failed. Make sure your CV is saved first.`;
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed?.error) message = parsed.error;
+        } catch {
+          if (text.trim()) message = text.trim();
+        }
+        setError(message);
+        return;
+      }
       const url = URL.createObjectURL(new Blob([res.data], { type: mime }));
       const a = document.createElement("a");
       a.href = url;
@@ -825,10 +840,18 @@ export default function CVBuilder() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      const { message, faceRequired: needsFace } = cvApiError(
-        err,
-        `${isWord ? "Word" : "PDF"} download failed. Make sure your CV is saved first.`
-      );
+      let fallback = `${isWord ? "Word" : "PDF"} download failed. Make sure your CV is saved first.`;
+      const data = err?.response?.data;
+      if (data instanceof Blob) {
+        try {
+          const text = await data.text();
+          const parsed = JSON.parse(text);
+          if (parsed?.error) fallback = parsed.error;
+        } catch {
+          /* keep fallback */
+        }
+      }
+      const { message, faceRequired: needsFace } = cvApiError(err, fallback);
       setError(message);
       setFaceRequired(needsFace);
     } finally {
