@@ -81,7 +81,7 @@ export default function FaceLogin() {
     setError("");
 
     const formData = new FormData();
-    formData.append("face", capturedImage.blob, "face.jpg");
+    formData.append("image", capturedImage.blob, "capture.jpg");
 
     try {
       const res = await api.post("/auth/face-login", formData);

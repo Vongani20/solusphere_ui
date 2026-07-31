@@ -121,7 +121,7 @@ export default function Profile() {
     setMessage("");
 
     const formData = new FormData();
-    formData.append("face", capturedImage.blob, "face.jpg");
+    formData.append("image", capturedImage.blob, "capture.jpg");
 
     try {
       const request = user?.face_status
