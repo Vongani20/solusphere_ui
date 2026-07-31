@@ -9,6 +9,8 @@ const PUBLIC_API_PATHS = [
   "/auth/login",
   "/auth/register",
   "/auth/face-login",
+  "/auth/scan-login",
+  "/auth/scan",
   "/auth/forgot-password",
   "/auth/reset-password",
   "/auth/outlook365/signup",

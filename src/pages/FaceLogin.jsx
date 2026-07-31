@@ -5,7 +5,7 @@ import AuthLayout, { AuthAlert } from "../components/AuthLayout";
 import useFaceFollowCamera from "../hooks/useFaceFollowCamera";
 import api, { clearSession, getApiError, saveSession } from "../services/api";
 import { getCameraErrorMessage, requestUserCamera } from "../utils/camera";
-import { canvasToJpegBlob, captureFollowedFace } from "../utils/faceCapture";
+import { blobToBase64, canvasToJpegBlob, captureFollowedFace } from "../utils/faceCapture";
 
 export default function FaceLogin() {
   const [capturedImage, setCapturedImage] = useState(null);
@@ -80,11 +80,9 @@ export default function FaceLogin() {
     setLoading(true);
     setError("");
 
-    const formData = new FormData();
-    formData.append("image", capturedImage.blob, "capture.jpg");
-
     try {
-      const res = await api.post("/auth/face-login", formData);
+      const image = await blobToBase64(capturedImage.blob);
+      const res = await api.post("/auth/scan-login", { image });
       saveSession({ token: res.data.token, user: res.data.user });
       navigate("/dashboard");
     } catch (err) {

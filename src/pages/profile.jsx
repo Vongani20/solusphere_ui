@@ -18,7 +18,7 @@ import UserAvatar from "../components/UserAvatar";
 import useFaceFollowCamera from "../hooks/useFaceFollowCamera";
 import api, { getApiError, saveSession } from "../services/api";
 import { getCameraErrorMessage, requestUserCamera } from "../utils/camera";
-import { canvasToJpegBlob, captureFollowedFace } from "../utils/faceCapture";
+import { blobToBase64, canvasToJpegBlob, captureFollowedFace } from "../utils/faceCapture";
 import { formatDate, titleize } from "../utils/formatters";
 
 export default function Profile() {
@@ -120,13 +120,11 @@ export default function Profile() {
     setError("");
     setMessage("");
 
-    const formData = new FormData();
-    formData.append("image", capturedImage.blob, "capture.jpg");
-
     try {
+      const image = await blobToBase64(capturedImage.blob);
       const request = user?.face_status
-        ? api.put("/face/update", formData)
-        : api.post("/face/register", formData);
+        ? api.put("/identity/update", { image })
+        : api.post("/identity/register", { image });
       const res = await request;
       setMessage(res.data.message || "Face profile saved.");
       setCapturedImage(null);
@@ -145,7 +143,7 @@ export default function Profile() {
     setMessage("");
 
     try {
-      const res = await api.delete("/face/delete");
+      const res = await api.delete("/identity/delete");
       setMessage(res.data.message || "Face profile deleted.");
       setCapturedImage(null);
       setCameraOpen(true);
