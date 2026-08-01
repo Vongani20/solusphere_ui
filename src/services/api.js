@@ -63,6 +63,24 @@ export function getApiError(error, fallback = "Something went wrong.") {
 
   const status = error?.response?.status;
   const data = error?.response?.data;
+
+  const rawText =
+    typeof data === "string"
+      ? data
+      : typeof data?.error === "string"
+        ? data.error
+        : typeof data?.message === "string"
+          ? data.message
+          : "";
+
+  if (/file transfer blocked|restricted access|bluecoat|mastercard policy/i.test(rawText)) {
+    return "Your network blocked this file transfer. Hard-refresh and try again — uploads now use a proxy-safe method. If it still fails, request AccessMC access for SoluSphere.";
+  }
+
+  if (typeof rawText === "string" && /<\/?(html|body|title)\b/i.test(rawText)) {
+    return fallback;
+  }
+
   const errorText = typeof data?.error === "string" ? data.error.trim() : "";
   const detailsText = typeof data?.details === "string" ? data.details.trim() : "";
 
@@ -89,6 +107,7 @@ export function getApiError(error, fallback = "Something went wrong.") {
   }
 
   if (typeof candidate === "string" && candidate.trim()) {
+    if (/<\/?(html|body|title)\b/i.test(candidate)) return fallback;
     return candidate;
   }
 

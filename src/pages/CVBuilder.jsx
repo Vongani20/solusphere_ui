@@ -14,6 +14,7 @@ import DocumentConsentPanel from "../components/DocumentConsentPanel";
 import api, { getApiError } from "../services/api";
 import { useDocumentProcessingConsent } from "../hooks/useDocumentProcessingConsent";
 import { resolveImageUrl } from "../utils/assets";
+import { blobToBase64 } from "../utils/faceCapture";
 
 const STEPS = ["Personal Info", "Skills & Qualifications", "Experience", "Review & Download"];
 
@@ -714,12 +715,12 @@ export default function CVBuilder() {
     setMessage("");
     setImportWarnings([]);
 
-    const formData = new FormData();
-    formData.append("document", file);
-
     try {
-      const res = await api.post("/cv/import", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      const document = await blobToBase64(file);
+      const ext = (file.name?.match(/\.(pdf|docx)$/i)?.[0] || ".pdf").toLowerCase();
+      const res = await api.post("/cv/import", {
+        document,
+        filename: `document${ext}`,
       });
       const imported = normalizeCv(res.data?.cv);
       setForm((prev) => ({
