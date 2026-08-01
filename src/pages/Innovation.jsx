@@ -45,17 +45,22 @@ export default function Innovation() {
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [ideas, setIdeas] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [editing, setEditing] = useState({});
 
   const loadIdeas = useCallback(async () => {
+    if (!isAdmin) {
+      setIdeas([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const res = await api.get(isAdmin ? "/admin/innovation" : "/innovation");
+      const res = await api.get("/admin/innovation");
       setIdeas(res.data.ideas || []);
     } catch (err) {
       setError(getApiError(err, "Failed to load innovation ideas."));
@@ -65,8 +70,8 @@ export default function Innovation() {
   }, [isAdmin]);
 
   useEffect(() => {
-    loadIdeas();
-  }, [loadIdeas]);
+    if (isAdmin) loadIdeas();
+  }, [isAdmin, loadIdeas]);
 
   useEffect(() => {
     return () => {
@@ -114,7 +119,7 @@ export default function Innovation() {
       const res = await api.post("/innovation", payload);
       setMessage(res.data.message || "Idea submitted successfully. Thank you!");
       resetForm();
-      await loadIdeas();
+      if (isAdmin) await loadIdeas();
     } catch (err) {
       setError(getApiError(err, "Submission failed. Please try again."));
     } finally {
@@ -250,6 +255,7 @@ export default function Innovation() {
           </div>
         </form>
 
+        {isAdmin ? (
         <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -257,10 +263,8 @@ export default function Innovation() {
                 <LightBulbIcon className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-[#0d2b36]">
-                  {isAdmin ? "All innovation ideas" : "My submitted ideas"}
-                </h2>
-                <p className="text-sm text-slate-500">{rows.length} record{rows.length === 1 ? "" : "s"}</p>
+                <h2 className="text-xl font-bold text-[#0d2b36]">Innovation responses</h2>
+                <p className="text-sm text-slate-500">{rows.length} record{rows.length === 1 ? "" : "s"} · admin only</p>
               </div>
             </div>
             <button
@@ -281,7 +285,7 @@ export default function Innovation() {
                   <th className="px-3 py-3">Employee</th>
                   <th className="px-3 py-3">Status</th>
                   <th className="px-3 py-3">Submitted</th>
-                  {isAdmin ? <th className="px-3 py-3">Committee</th> : <th className="px-3 py-3">Reviewer</th>}
+                  <th className="px-3 py-3">Committee</th>
                 </tr>
               </thead>
               <tbody>
@@ -327,59 +331,52 @@ export default function Innovation() {
                         </td>
                         <td className="px-3 py-4 text-slate-600">{formatDate(idea.created_at)}</td>
                         <td className="px-3 py-4">
-                          {isAdmin ? (
-                            <div className="min-w-[14rem] space-y-2">
-                              <input
-                                className="input"
-                                placeholder="Reviewer"
-                                value={draft.reviewer}
-                                onChange={(e) =>
-                                  setEditing((prev) => ({
-                                    ...prev,
-                                    [idea.id]: { ...draft, reviewer: e.target.value },
-                                  }))
-                                }
-                              />
-                              <select
-                                className="input"
-                                value={draft.status}
-                                onChange={(e) =>
-                                  setEditing((prev) => ({
-                                    ...prev,
-                                    [idea.id]: { ...draft, status: e.target.value },
-                                  }))
-                                }
-                              >
-                                <option value="submitted">Submitted</option>
-                                <option value="in_review">In review</option>
-                                <option value="approved">Approved</option>
-                                <option value="rejected">Rejected</option>
-                              </select>
-                              <textarea
-                                className="input min-h-[4rem]"
-                                placeholder="Comments"
-                                value={draft.comments}
-                                onChange={(e) =>
-                                  setEditing((prev) => ({
-                                    ...prev,
-                                    [idea.id]: { ...draft, comments: e.target.value },
-                                  }))
-                                }
-                              />
-                              <button
-                                type="button"
-                                onClick={() => saveCommittee(idea.id)}
-                                className="rounded-full bg-[#0b2f3b] px-4 py-2 text-xs font-bold text-white"
-                              >
-                                Save
-                              </button>
-                            </div>
-                          ) : (
-                            <div>
-                              <p className="font-semibold text-slate-800">{idea.reviewer || "—"}</p>
-                              <p className="mt-1 text-slate-500">{idea.comments || "No comments yet"}</p>
-                            </div>
-                          )}
+                          <div className="min-w-[14rem] space-y-2">
+                            <input
+                              className="input"
+                              placeholder="Reviewer"
+                              value={draft.reviewer}
+                              onChange={(e) =>
+                                setEditing((prev) => ({
+                                  ...prev,
+                                  [idea.id]: { ...draft, reviewer: e.target.value },
+                                }))
+                              }
+                            />
+                            <select
+                              className="input"
+                              value={draft.status}
+                              onChange={(e) =>
+                                setEditing((prev) => ({
+                                  ...prev,
+                                  [idea.id]: { ...draft, status: e.target.value },
+                                }))
+                              }
+                            >
+                              <option value="submitted">Submitted</option>
+                              <option value="in_review">In review</option>
+                              <option value="approved">Approved</option>
+                              <option value="rejected">Rejected</option>
+                            </select>
+                            <textarea
+                              className="input min-h-[4rem]"
+                              placeholder="Comments"
+                              value={draft.comments}
+                              onChange={(e) =>
+                                setEditing((prev) => ({
+                                  ...prev,
+                                  [idea.id]: { ...draft, comments: e.target.value },
+                                }))
+                              }
+                            />
+                            <button
+                              type="button"
+                              onClick={() => saveCommittee(idea.id)}
+                              className="rounded-full bg-[#0b2f3b] px-4 py-2 text-xs font-bold text-white"
+                            >
+                              Save
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -389,6 +386,7 @@ export default function Innovation() {
             </table>
           </div>
         </section>
+        ) : null}
       </div>
     </DashboardLayout>
   );
