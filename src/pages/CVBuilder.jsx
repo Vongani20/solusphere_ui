@@ -668,7 +668,24 @@ export default function CVBuilder() {
 
   // ─── API actions ─────────────────────────────────────────────────────────────
 
+  const logCvBuilderEvent = (payload) => {
+    api.post("/cv/logs", payload).catch(() => {
+      /* logging must not block CV builder UX */
+    });
+  };
+
   const saveAndNext = async (nextStep) => {
+    if (nextStep) {
+      logCvBuilderEvent({
+        action: "next_step",
+        from_step: step,
+        to_step: nextStep,
+        from_label: STEPS[step - 1] || "",
+        to_label: STEPS[nextStep - 1] || "",
+        status: "clicked",
+      });
+    }
+
     if (!ensureConsent()) {
       setError("Sign consent before saving your CV.");
       return;
@@ -806,6 +823,13 @@ export default function CVBuilder() {
 
   const downloadCV = async (format = "pdf") => {
     const isWord = format === "word";
+    logCvBuilderEvent({
+      action: isWord ? "download_word" : "download_pdf",
+      from_step: step,
+      from_label: STEPS[step - 1] || "",
+      format: isWord ? "word" : "pdf",
+      status: "clicked",
+    });
     setDownloading(format);
     setError("");
     setFaceRequired(false);

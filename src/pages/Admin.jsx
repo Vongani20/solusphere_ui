@@ -47,6 +47,7 @@ const tabs = [
   { id: "events", label: "Events", icon: CalendarDaysIcon },
   { id: "helpdesk", label: "Helpdesk", icon: TicketIcon },
   { id: "login-audit", label: "Login Audit", icon: ClockIcon },
+  { id: "cv-builder-logs", label: "CV Builder Logs", icon: DocumentTextIcon },
   { id: "cvs", label: "CV Management", icon: DocumentTextIcon },
 ];
 
@@ -96,6 +97,13 @@ export default function Admin() {
   const [loginAuditStatus, setLoginAuditStatus] = useState("");
   const [loginAuditMethod, setLoginAuditMethod] = useState("");
   const [loginAuditPage, setLoginAuditPage] = useState(1);
+
+  const [cvBuilderLogs, setCvBuilderLogs] = useState([]);
+  const [cvBuilderLogPagination, setCvBuilderLogPagination] = useState(null);
+  const [loadingCvBuilderLogs, setLoadingCvBuilderLogs] = useState(false);
+  const [cvBuilderLogEmail, setCvBuilderLogEmail] = useState("");
+  const [cvBuilderLogAction, setCvBuilderLogAction] = useState("");
+  const [cvBuilderLogPage, setCvBuilderLogPage] = useState(1);
 
   const selectedUser = useMemo(
     () => users.find((user) => user.id === editingUserID),
@@ -174,6 +182,10 @@ export default function Admin() {
     if (activeTab === "login-audit") loadLoginAudits();
   }, [activeTab, loginAuditPage]);
 
+  useEffect(() => {
+    if (activeTab === "cv-builder-logs") loadCvBuilderLogs();
+  }, [activeTab, cvBuilderLogPage]);
+
   const viewUserLoginHistory = (user) => {
     setLoginAuditEmail(user.email || "");
     setLoginAuditStatus("");
@@ -201,6 +213,27 @@ export default function Admin() {
       setError(getApiError(err, "Failed to load login audit logs."));
     } finally {
       setLoadingLoginAudits(false);
+    }
+  };
+
+  const loadCvBuilderLogs = async () => {
+    setLoadingCvBuilderLogs(true);
+    setError("");
+    try {
+      const res = await api.get("/admin/cv-builder-logs", {
+        params: {
+          page: cvBuilderLogPage,
+          limit: 50,
+          email: cvBuilderLogEmail || undefined,
+          action: cvBuilderLogAction || undefined,
+        },
+      });
+      setCvBuilderLogs(res.data.logs || []);
+      setCvBuilderLogPagination(res.data.pagination || null);
+    } catch (err) {
+      setError(getApiError(err, "Failed to load CV builder logs."));
+    } finally {
+      setLoadingCvBuilderLogs(false);
     }
   };
 
@@ -1012,6 +1045,154 @@ export default function Admin() {
                   type="button"
                   disabled={loginAuditPage >= loginAuditPagination.totalPages}
                   onClick={() => setLoginAuditPage((value) => value + 1)}
+                  className="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeTab === "cv-builder-logs" && (
+          <section className="card space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">CV Builder Logs</h2>
+                <p className="text-sm text-slate-500">
+                  Next-step and download click events from the CV Builder
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadCvBuilderLogs}
+                className="btn btn-secondary inline-flex items-center gap-2"
+              >
+                <ArrowPathIcon className={`h-5 w-5 ${loadingCvBuilderLogs ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Email</span>
+                <input
+                  type="text"
+                  value={cvBuilderLogEmail}
+                  onChange={(event) => setCvBuilderLogEmail(event.target.value)}
+                  className="input"
+                  placeholder="Search by email"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Action</span>
+                <select
+                  value={cvBuilderLogAction}
+                  onChange={(event) => {
+                    setCvBuilderLogAction(event.target.value);
+                    setCvBuilderLogPage(1);
+                  }}
+                  className="input bg-white"
+                >
+                  <option value="">All</option>
+                  <option value="next_step">Next step</option>
+                  <option value="download_pdf">Download PDF</option>
+                  <option value="download_word">Download Word</option>
+                </select>
+              </label>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCvBuilderLogPage(1);
+                    loadCvBuilderLogs();
+                  }}
+                  className="btn btn-primary w-full"
+                >
+                  Apply filters
+                </button>
+              </div>
+            </div>
+
+            <DataCard
+              title="CV Builder events"
+              detail={
+                cvBuilderLogPagination
+                  ? `${cvBuilderLogPagination.total} total records`
+                  : `${cvBuilderLogs.length} records`
+              }
+            >
+              {cvBuilderLogs.length === 0 ? (
+                <EmptyState
+                  text={loadingCvBuilderLogs ? "Loading CV builder logs..." : "No CV builder events found."}
+                />
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {["When", "User", "Email", "Action", "Step", "Status", "IP", "Details"].map((heading) => (
+                          <th
+                            key={heading}
+                            className="whitespace-nowrap px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
+                          >
+                            {heading}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {cvBuilderLogs.map((entry) => {
+                        const stepLabel =
+                          entry.action === "next_step"
+                            ? `${entry.from_label || entry.from_step || "—"} → ${entry.to_label || entry.to_step || "—"}`
+                            : entry.from_label || entry.format || "—";
+                        return (
+                          <tr key={entry.id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                              {formatDate(entry.created_at)}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">
+                              {entry.username || (entry.user_id ? `User #${entry.user_id}` : "—")}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{entry.email || "—"}</td>
+                            <td className="px-4 py-3 text-sm text-slate-700">{titleize(entry.action)}</td>
+                            <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{stepLabel}</td>
+                            <td className="px-4 py-3">
+                              <span className={statusTone(entry.status)}>{entry.status}</span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                              {entry.ip_address || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">
+                              {entry.detail || "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </DataCard>
+
+            {cvBuilderLogPagination && cvBuilderLogPagination.totalPages > 1 && (
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  disabled={cvBuilderLogPage <= 1}
+                  onClick={() => setCvBuilderLogPage((value) => Math.max(1, value - 1))}
+                  className="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <p className="text-sm font-semibold text-slate-600">
+                  Page {cvBuilderLogPagination.page} of {cvBuilderLogPagination.totalPages}
+                </p>
+                <button
+                  type="button"
+                  disabled={cvBuilderLogPage >= cvBuilderLogPagination.totalPages}
+                  onClick={() => setCvBuilderLogPage((value) => value + 1)}
                   className="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Next
