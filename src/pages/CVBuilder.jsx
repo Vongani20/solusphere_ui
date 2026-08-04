@@ -596,10 +596,13 @@ export default function CVBuilder() {
 
     try {
       const document = await blobToBase64(file);
-      const ext = (file.name?.match(/\.(pdf|docx)$/i)?.[0] || ".pdf").toLowerCase();
+      const rawExt = (file.name?.match(/\.([a-z0-9]+)$/i)?.[1] || "pdf").toLowerCase();
+      const safeExt = ["pdf", "docx", "doc", "odt", "rtf", "txt", "jpg", "jpeg", "png", "gif", "webp"].includes(rawExt)
+        ? rawExt
+        : "bin";
       const res = await api.post("/cv/import", {
         document,
-        filename: `document${ext}`,
+        filename: `document.${safeExt}`,
       });
       const imported = normalizeCv(res.data?.cv);
       setForm((prev) => ({
@@ -612,7 +615,7 @@ export default function CVBuilder() {
     } catch (err) {
       const { message, faceRequired: needsFace, consentRequired } = cvApiError(
         err,
-        "Could not import CV. Upload a text-based PDF or Word (.docx) and try again."
+        "Could not import CV. Try PDF, Word, image scan, or another readable document."
       );
       setError(message);
       setFaceRequired(needsFace);
@@ -774,15 +777,15 @@ export default function CVBuilder() {
           consents={consents}
           onSignClick={openConsentModal}
           title="CV Builder consent required"
-          description="You must sign consent before saving your CV, importing a PDF or Word document, or uploading a profile photo."
+          description="You must sign consent before saving your CV, importing a document, or uploading a profile photo."
         />
 
         <div className={`rounded-lg border border-slate-200 bg-white p-4 shadow-sm ${!hasConsent ? "opacity-60" : ""}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-bold text-heading">Extract from PDF or Word</p>
+              <p className="text-xs font-bold text-heading">Extract from any document</p>
               <p className="mt-0.5 text-[9px] text-muted">
-                Upload a PDF or Word (.docx) CV to pre-fill the wizard. Review every field before saving.
+                Upload PDF, Word (.doc/.docx), OpenDocument, RTF, text, or a scanned image. Scanned PDFs use OCR automatically.
               </p>
               {!hasConsent && !consentLoading && (
                 <p className="mt-2 text-[10px] font-semibold text-amber-800">Sign consent above to enable import.</p>
@@ -800,7 +803,7 @@ export default function CVBuilder() {
               <input
                 key={cvFileInputKey}
                 type="file"
-                accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+                accept=".pdf,.doc,.docx,.odt,.rtf,.txt,.jpg,.jpeg,.png,.gif,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*"
                 className="hidden"
                 disabled={importingCv || !hasConsent}
                 onChange={importCvDocument}
