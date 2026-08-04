@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowDownTrayIcon,
@@ -70,7 +70,6 @@ const MONTH_OPTIONS = [
   { value: "12", label: "December", short: "Dec" },
 ];
 
-const DOB_YEAR_START = 1930;
 const MONTH_NAME_TO_VALUE = MONTH_OPTIONS.reduce((acc, month) => {
   acc[month.label.toLowerCase()] = month.value;
   acc[month.short.toLowerCase()] = month.value;
@@ -79,17 +78,6 @@ const MONTH_NAME_TO_VALUE = MONTH_OPTIONS.reduce((acc, month) => {
 }, {});
 
 const monthLabel = (month) => MONTH_OPTIONS.find((m) => m.value === month)?.label || "";
-
-const splitISODate = (value) => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || "").trim());
-  if (!match) return { year: "", month: "", day: "" };
-  return { year: match[1], month: match[2], day: match[3] };
-};
-
-const joinISODate = (year, month, day) => {
-  if (!year || !month || !day) return "";
-  return `${year}-${month}-${day}`;
-};
 
 const splitYearMonth = (value) => {
   const match = /^(\d{4})-(\d{2})$/.exec(String(value || "").trim());
@@ -100,11 +88,6 @@ const splitYearMonth = (value) => {
 const joinYearMonth = (year, month) => {
   if (!year || !month) return "";
   return `${year}-${month}`;
-};
-
-const daysInMonth = (year, month) => {
-  if (!year || !month) return 31;
-  return new Date(Number(year), Number(month), 0).getDate();
 };
 
 const yearOptionsDescending = (startYear, endYear) => {
@@ -128,12 +111,6 @@ const decadeGroups = (years) => {
     }
   }
   return groups;
-};
-
-const formatFriendlyDate = (value) => {
-  const { year, month, day } = splitISODate(value);
-  if (!year || !month || !day) return "";
-  return `${Number(day)} ${monthLabel(month)} ${year}`;
 };
 
 const formatFriendlyMonthYear = (value) => {
@@ -199,110 +176,6 @@ const normalizeExperienceList = (experience) => {
         : [""],
   }));
 };
-
-function DateOfBirthSelects({ value, onChange, hasError }) {
-  const parsed = splitISODate(value);
-  const [draft, setDraft] = useState(parsed);
-  const currentYear = new Date().getFullYear();
-  const years = yearOptionsDescending(DOB_YEAR_START, currentYear - 14);
-  const yearGroups = decadeGroups(years);
-  const maxDay = daysInMonth(draft.year, draft.month);
-  const days = Array.from({ length: maxDay }, (_, i) => String(i + 1).padStart(2, "0"));
-  const safeDay = draft.day && Number(draft.day) > maxDay ? "" : draft.day;
-  const friendly = formatFriendlyDate(joinISODate(draft.year, draft.month, safeDay));
-
-  useEffect(() => {
-    const next = splitISODate(value);
-    setDraft((prev) => {
-      if (prev.year === next.year && prev.month === next.month && prev.day === next.day) {
-        return prev;
-      }
-      if (!next.year && !next.month && !next.day && (prev.year || prev.month || prev.day)) {
-        return prev;
-      }
-      return next;
-    });
-  }, [value]);
-
-  const updatePart = (part, nextValue) => {
-    setDraft((prev) => {
-      const next = { ...prev, [part]: nextValue };
-      if (part !== "day") {
-        const nextMax = daysInMonth(next.year, next.month);
-        if (next.day && Number(next.day) > nextMax) next.day = "";
-      }
-      onChange(joinISODate(next.year, next.month, next.day));
-      return next;
-    });
-  };
-
-  const selectClass = `input ${hasError ? "input-error" : ""}`;
-
-  return (
-    <div className="mt-1 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <p className="text-[10px] text-slate-500">Pick day, month, and year from the lists below.</p>
-      <div className="grid grid-cols-3 gap-2">
-        <label className="block">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Day</span>
-          <select
-            className={selectClass}
-            value={safeDay}
-            onChange={(e) => updatePart("day", e.target.value)}
-            aria-label="Day of birth"
-          >
-            <option value="">Day</option>
-            {days.map((d) => (
-              <option key={d} value={d}>
-                {Number(d)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Month</span>
-          <select
-            className={selectClass}
-            value={draft.month}
-            onChange={(e) => updatePart("month", e.target.value)}
-            aria-label="Month of birth"
-          >
-            <option value="">Month</option>
-            {MONTH_OPTIONS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">Year</span>
-          <select
-            className={selectClass}
-            value={draft.year}
-            onChange={(e) => updatePart("year", e.target.value)}
-            aria-label="Year of birth"
-          >
-            <option value="">Year</option>
-            {yearGroups.map((group) => (
-              <optgroup key={group.label} label={group.label}>
-                {group.years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
-      </div>
-      {friendly ? (
-        <p className="text-[11px] font-semibold text-emerald-700">Saved as {friendly}</p>
-      ) : (
-        <p className="text-[11px] text-slate-400">Choose all three to save the date.</p>
-      )}
-    </div>
-  );
-}
 
 function MonthYearSelects({
   value,
@@ -426,17 +299,6 @@ function MonthYearSelects({
 const cleanStringList = (items) =>
   (items ?? []).map((item) => String(item).trim()).filter(Boolean);
 
-const normalizeDateOfBirth = (value) => {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-  const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10);
-  }
-  return raw;
-};
-
 const prepareFormForSave = (form) => {
   const professional_skills = form.professional_skills
     .map((skill) => ({
@@ -466,10 +328,10 @@ const prepareFormForSave = (form) => {
     first_name: form.first_name.trim(),
     last_name: form.last_name.trim(),
     profile_text: form.profile_text.trim(),
-    value_proposition: form.value_proposition.trim(),
+    value_proposition: "",
     gender: String(form.gender ?? "").trim(),
     nationality: form.nationality.trim(),
-    date_of_birth: normalizeDateOfBirth(form.date_of_birth),
+    date_of_birth: "",
     professional_skills,
     qualifications: cleanStringList(form.qualifications),
     computer_skills: cleanStringList(form.computer_skills),
@@ -572,7 +434,7 @@ export default function CVBuilder() {
     };
   }, []);
 
-  // ─── generic helpers for simple string arrays ───────────────────────────────
+  // â”€â”€â”€ generic helpers for simple string arrays â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const addItem = (field) =>
     setForm((p) => ({ ...p, [field]: [...p[field], ""] }));
@@ -587,7 +449,7 @@ export default function CVBuilder() {
       return { ...p, [field]: a };
     });
 
-  // ─── professional_skills helpers ────────────────────────────────────────────
+  // â”€â”€â”€ professional_skills helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const addSkill = () =>
     setForm((p) => ({ ...p, professional_skills: [...p.professional_skills, emptySkill()] }));
@@ -628,7 +490,7 @@ export default function CVBuilder() {
       return { ...p, professional_skills: a };
     });
 
-  // ─── experience helpers ─────────────────────────────────────────────────────
+  // â”€â”€â”€ experience helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const addExperience = () =>
     setForm((p) => ({ ...p, experience: [...p.experience, emptyExperience()] }));
@@ -666,7 +528,7 @@ export default function CVBuilder() {
       return { ...p, experience: a };
     });
 
-  // ─── API actions ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€ API actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const logCvBuilderEvent = (payload) => {
     api.post("/cv/logs", payload).catch(() => {
@@ -884,7 +746,7 @@ export default function CVBuilder() {
     }
   };
 
-  // ─── render ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   if (loading) {
     return (
@@ -970,7 +832,7 @@ export default function CVBuilder() {
                 to="/profile"
                 className="mt-2 inline-flex text-xs font-bold text-primary hover:underline"
               >
-                Go to Profile to register your face →
+                Go to Profile to register your face â†’
               </Link>
             )}
           </div>
@@ -1055,7 +917,7 @@ export default function CVBuilder() {
   );
 }
 
-// ─── Step 1: Personal Info ────────────────────────────────────────────────────
+// â”€â”€â”€ Step 1: Personal Info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Step1({ form, setForm, fieldErrors, saving, onNext }) {
   const set = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
@@ -1110,20 +972,6 @@ function Step1({ form, setForm, fieldErrors, saving, onNext }) {
           />
           <FieldError errors={fieldErrors} field="nationality" />
         </label>
-        <div className="block">
-          <FieldLabel text="Date of Birth" required />
-          <DateOfBirthSelects
-            value={form.date_of_birth}
-            hasError={Boolean(fieldErrors.date_of_birth)}
-            onChange={(next) =>
-              setForm((prev) => ({
-                ...prev,
-                date_of_birth: next,
-              }))
-            }
-          />
-          <FieldError errors={fieldErrors} field="date_of_birth" />
-        </div>
       </div>
 
       <label className="block">
@@ -1139,29 +987,16 @@ function Step1({ form, setForm, fieldErrors, saving, onNext }) {
         <FieldError errors={fieldErrors} field="profile_text" />
       </label>
 
-      <label className="block">
-        <FieldLabel text="Value Proposition" required />
-        <p className="mb-1 text-xs text-slate-400">What unique value do you bring?</p>
-        <textarea
-          rows={5}
-          className={`input mt-1 ${fieldErrors.value_proposition ? "input-error" : ""}`}
-          value={form.value_proposition}
-          onChange={set("value_proposition")}
-          placeholder="I deliver..."
-        />
-        <FieldError errors={fieldErrors} field="value_proposition" />
-      </label>
-
       <div className="flex justify-end">
         <button className="btn btn-primary" onClick={onNext} disabled={saving}>
-          {saving ? "Saving…" : "Next: Skills & Qualifications →"}
+          {saving ? "Savingâ€¦" : "Next: Skills & Qualifications â†’"}
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Step 2: Skills & Qualifications ─────────────────────────────────────────
+// â”€â”€â”€ Step 2: Skills & Qualifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Step2({
   form,
@@ -1301,17 +1136,17 @@ function Step2({
 
       <div className="flex justify-between">
         <button className="btn btn-secondary" onClick={onBack}>
-          ← Back
+          â† Back
         </button>
         <button className="btn btn-primary" onClick={onNext} disabled={saving}>
-          {saving ? "Saving…" : "Next: Experience →"}
+          {saving ? "Savingâ€¦" : "Next: Experience â†’"}
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Step 3: Experience ───────────────────────────────────────────────────────
+// â”€â”€â”€ Step 3: Experience â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Step3({
   form,
@@ -1433,17 +1268,17 @@ function Step3({
 
       <div className="flex justify-between">
         <button className="btn btn-secondary" onClick={onBack}>
-          ← Back
+          â† Back
         </button>
         <button className="btn btn-primary" onClick={onNext} disabled={saving}>
-          {saving ? "Saving…" : "Next: Review & Download →"}
+          {saving ? "Savingâ€¦" : "Next: Review & Download â†’"}
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Step 4: Review & Download ────────────────────────────────────────────────
+// â”€â”€â”€ Step 4: Review & Download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Step4({
   form,
@@ -1460,17 +1295,13 @@ function Step4({
   return (
     <div className="space-y-6">
       <div className="grid gap-6 xl:grid-cols-2">
-        {/* Left — read-only CV summary */}
+        {/* Left â€” read-only CV summary */}
         <div className="space-y-4">
           <ReviewSection title="Personal Information">
             <dl className="space-y-2 text-sm">
               <ReviewField label="Name" value={`${form.first_name} ${form.last_name}`} />
               <ReviewField label="Gender" value={form.gender} />
               <ReviewField label="Nationality" value={form.nationality} />
-              <ReviewField
-                label="Date of Birth"
-                value={formatFriendlyDate(form.date_of_birth) || form.date_of_birth}
-              />
             </dl>
             {form.profile_text && (
               <div className="mt-3">
@@ -1478,20 +1309,12 @@ function Step4({
                 <p className="mt-1 text-sm text-slate-700">{form.profile_text}</p>
               </div>
             )}
-            {form.value_proposition && (
-              <div className="mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Value Proposition
-                </p>
-                <p className="mt-1 text-sm text-slate-700">{form.value_proposition}</p>
-              </div>
-            )}
           </ReviewSection>
 
           <ReviewSection title="Professional Skills">
             {form.professional_skills.map((s, i) => (
               <div key={i} className="mb-2">
-                <p className="text-sm font-medium text-slate-800">{s.skill || "—"}</p>
+                <p className="text-sm font-medium text-slate-800">{s.skill || "â€”"}</p>
                 {(s.details ?? []).filter(Boolean).length > 0 && (
                   <ul className="ml-4 mt-1 list-disc text-sm text-slate-600">
                     {(s.details ?? []).filter(Boolean).map((d, di) => (
@@ -1530,7 +1353,7 @@ function Step4({
                 <p className="text-sm text-slate-600">{exp.position}</p>
                 {(exp.period_start || exp.period_end) && (
                   <p className="text-xs text-slate-400">
-                    {formatFriendlyMonthYear(exp.period_start) || exp.period_start || "—"} –{" "}
+                    {formatFriendlyMonthYear(exp.period_start) || exp.period_start || "â€”"} â€“{" "}
                     {exp.period_end === "Present" || !exp.period_end
                       ? "Present"
                       : formatFriendlyMonthYear(exp.period_end) || exp.period_end}
@@ -1548,7 +1371,7 @@ function Step4({
           </ReviewSection>
         </div>
 
-        {/* Right — photo upload + download */}
+        {/* Right â€” photo upload + download */}
         <div className="space-y-4">
           <div className="card space-y-4">
             <SectionHeader title="Profile Photo" />
@@ -1566,7 +1389,7 @@ function Step4({
               )}
               <label className="btn btn-secondary inline-flex cursor-pointer items-center gap-2">
                 <PhotoIcon className="h-4 w-4" />
-                {uploadingPhoto ? "Uploading…" : "Upload Photo"}
+                {uploadingPhoto ? "Uploadingâ€¦" : "Upload Photo"}
                 <input
                   key={photoFileInputKey}
                   type="file"
@@ -1590,7 +1413,7 @@ function Step4({
               onClick={onSave}
               disabled={saving}
             >
-              {saving ? "Saving…" : "Save CV"}
+              {saving ? "Savingâ€¦" : "Save CV"}
             </button>
             <button
               className="btn btn-primary inline-flex w-full items-center justify-center gap-2"
@@ -1598,7 +1421,7 @@ function Step4({
               disabled={!!downloading}
             >
               <ArrowDownTrayIcon className="h-5 w-5" />
-              {downloading === "pdf" ? "Generating PDF…" : "Download PDF"}
+              {downloading === "pdf" ? "Generating PDFâ€¦" : "Download PDF"}
             </button>
             <button
               className="btn btn-secondary inline-flex w-full items-center justify-center gap-2"
@@ -1606,7 +1429,7 @@ function Step4({
               disabled={!!downloading}
             >
               <ArrowDownTrayIcon className="h-5 w-5" />
-              {downloading === "word" ? "Generating Word…" : "Download Word"}
+              {downloading === "word" ? "Generating Wordâ€¦" : "Download Word"}
             </button>
           </div>
         </div>
@@ -1614,14 +1437,14 @@ function Step4({
 
       <div className="flex justify-start">
         <button className="btn btn-secondary" onClick={onBack}>
-          ← Back
+          â† Back
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Shared sub-components ────────────────────────────────────────────────────
+// â”€â”€â”€ Shared sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StepIndicator({ current }) {
   return (
@@ -1733,7 +1556,7 @@ function ReviewField({ label, value }) {
   return (
     <div className="flex gap-2">
       <dt className="w-28 shrink-0 text-xs font-medium text-slate-500">{label}</dt>
-      <dd className="text-slate-800">{value || "—"}</dd>
+      <dd className="text-slate-800">{value || "â€”"}</dd>
     </div>
   );
 }

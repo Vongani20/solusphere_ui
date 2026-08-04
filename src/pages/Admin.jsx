@@ -1450,7 +1450,7 @@ export default function Admin() {
                         {selectedCv.first_name} {selectedCv.last_name}
                       </h3>
                       <p className="text-sm text-slate-500">
-                        {selectedCv.nationality} · {selectedCv.gender} · DOB: {formatDateOnly(selectedCv.date_of_birth)}
+                        {selectedCv.nationality} · {selectedCv.gender}
                       </p>
                     </div>
                   </div>
@@ -1486,9 +1486,6 @@ export default function Admin() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <CvDetailSection title="Profile">
                     <p className="text-sm text-slate-700">{selectedCv.profile_text || "—"}</p>
-                  </CvDetailSection>
-                  <CvDetailSection title="Value Proposition">
-                    <p className="text-sm text-slate-700">{selectedCv.value_proposition || "—"}</p>
                   </CvDetailSection>
                   <CvDetailSection title="Languages">
                     <CvDetailList items={selectedCv.languages} />
