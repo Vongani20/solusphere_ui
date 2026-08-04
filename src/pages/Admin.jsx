@@ -101,6 +101,7 @@ export default function Admin() {
   const [cvBuilderLogs, setCvBuilderLogs] = useState([]);
   const [cvBuilderLogPagination, setCvBuilderLogPagination] = useState(null);
   const [loadingCvBuilderLogs, setLoadingCvBuilderLogs] = useState(false);
+  const [downloadingCvBuilderLogs, setDownloadingCvBuilderLogs] = useState(false);
   const [cvBuilderLogEmail, setCvBuilderLogEmail] = useState("");
   const [cvBuilderLogAction, setCvBuilderLogAction] = useState("");
   const [cvBuilderLogPage, setCvBuilderLogPage] = useState(1);
@@ -234,6 +235,45 @@ export default function Admin() {
       setError(getApiError(err, "Failed to load CV builder logs."));
     } finally {
       setLoadingCvBuilderLogs(false);
+    }
+  };
+
+  const downloadCvBuilderLogsTxt = async () => {
+    setDownloadingCvBuilderLogs(true);
+    setError("");
+    try {
+      const res = await api.get("/admin/cv-builder-logs/download", {
+        responseType: "blob",
+        params: {
+          email: cvBuilderLogEmail || undefined,
+          action: cvBuilderLogAction || undefined,
+        },
+      });
+      const contentType = String(res.headers?.["content-type"] || "");
+      if (contentType.includes("application/json")) {
+        const text = await res.data.text();
+        let message = "Failed to download CV builder logs.";
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed?.error) message = parsed.error;
+        } catch {
+          if (text.trim()) message = text.trim();
+        }
+        setError(message);
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([res.data], { type: "text/plain;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cv_builder_logs_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(getApiError(err, "Failed to download CV builder logs."));
+    } finally {
+      setDownloadingCvBuilderLogs(false);
     }
   };
 
@@ -1063,14 +1103,25 @@ export default function Admin() {
                   Next-step and download click events from the CV Builder
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={loadCvBuilderLogs}
-                className="btn btn-secondary inline-flex items-center gap-2"
-              >
-                <ArrowPathIcon className={`h-5 w-5 ${loadingCvBuilderLogs ? "animate-spin" : ""}`} />
-                Refresh
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={downloadCvBuilderLogsTxt}
+                  disabled={downloadingCvBuilderLogs}
+                  className="btn btn-primary inline-flex items-center gap-2 disabled:opacity-50"
+                >
+                  <ArrowDownTrayIcon className="h-5 w-5" />
+                  {downloadingCvBuilderLogs ? "Downloading…" : "Download TXT"}
+                </button>
+                <button
+                  type="button"
+                  onClick={loadCvBuilderLogs}
+                  className="btn btn-secondary inline-flex items-center gap-2"
+                >
+                  <ArrowPathIcon className={`h-5 w-5 ${loadingCvBuilderLogs ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
