@@ -1335,7 +1335,7 @@ export default function Admin() {
 
             {/* CV list */}
             <div className="card">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-slate-500">
                   {cvs.length} CV{cvs.length !== 1 ? "s" : ""} found
                   {cvTotalCount > 0 && cvs.length !== cvTotalCount ? ` (${cvTotalCount} total in directory)` : ""}
@@ -1343,7 +1343,7 @@ export default function Admin() {
                 <button
                   type="button"
                   onClick={loadCvs}
-                  className="btn btn-secondary inline-flex items-center gap-2"
+                  className="btn btn-secondary inline-flex w-full items-center justify-center gap-2 sm:w-auto"
                 >
                   <ArrowPathIcon className={`h-4 w-4 ${loadingCvs ? "animate-spin" : ""}`} />
                   Refresh
@@ -1360,72 +1360,143 @@ export default function Admin() {
                   }
                 />
               ) : (
-                <div className="overflow-hidden rounded-lg border border-slate-200">
-                  <table className="min-w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        {["Photo", "Name", "Top Skills", "Qualifications", "Updated", "Actions"].map((h) => (
-                          <th
-                            key={h}
-                            className="whitespace-nowrap px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
+                <>
+                  {/* Mobile / narrow: stacked cards */}
+                  <div className="space-y-3 md:hidden">
+                    {cvs.map((cv) => (
+                      <div
+                        key={cv.user_id}
+                        className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                      >
+                        <div className="flex items-start gap-3">
+                          <CvSearchPhoto
+                            photoUrl={cv.profile_photo_url}
+                            name={`${cv.first_name} ${cv.last_name}`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-900">
+                              {cv.first_name} {cv.last_name}
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-400">{formatDate(cv.updated_at)}</p>
+                          </div>
+                        </div>
+                        <dl className="mt-3 space-y-2 text-sm">
+                          <div>
+                            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Top skills</dt>
+                            <dd className="mt-0.5 break-words text-slate-700">
+                              {cv.professional_skills?.map((s) => s.skill).filter(Boolean).join(", ") || "—"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Qualifications</dt>
+                            <dd className="mt-0.5 break-words text-slate-700">
+                              {cv.qualifications?.filter(Boolean).join(", ") || "—"}
+                            </dd>
+                          </div>
+                        </dl>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => viewCv(cv.user_id)}
+                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-primary border border-primary hover:bg-primary hover:text-white transition"
                           >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {cvs.map((cv) => (
-                        <tr key={cv.user_id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3">
-                            <CvSearchPhoto photoUrl={cv.profile_photo_url} name={`${cv.first_name} ${cv.last_name}`} />
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">
-                            {cv.first_name} {cv.last_name}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 max-w-xs truncate">
-                            {cv.professional_skills?.map((s) => s.skill).filter(Boolean).join(", ") || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600 max-w-xs truncate">
-                            {cv.qualifications?.filter(Boolean).join(", ") || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
-                            {formatDate(cv.updated_at)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => viewCv(cv.user_id)}
-                                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-primary border border-primary hover:bg-primary hover:text-white transition"
-                              >
-                                View
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => downloadCvFile(cv.user_id, `${cv.first_name}_${cv.last_name}`, "pdf")}
-                                disabled={downloadingCvId === `${cv.user_id}:pdf`}
-                                className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition"
-                              >
-                                <ArrowDownTrayIcon className="h-3.5 w-3.5" />
-                                {downloadingCvId === `${cv.user_id}:pdf` ? "…" : "PDF"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => downloadCvFile(cv.user_id, `${cv.first_name}_${cv.last_name}`, "word")}
-                                disabled={downloadingCvId === `${cv.user_id}:word`}
-                                className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-teal-700 text-white hover:bg-teal-600 disabled:opacity-50 transition"
-                              >
-                                <ArrowDownTrayIcon className="h-3.5 w-3.5" />
-                                {downloadingCvId === `${cv.user_id}:word` ? "…" : "Word"}
-                              </button>
-                            </div>
-                          </td>
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadCvFile(cv.user_id, `${cv.first_name}_${cv.last_name}`, "pdf")}
+                            disabled={downloadingCvId === `${cv.user_id}:pdf`}
+                            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition"
+                          >
+                            <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                            {downloadingCvId === `${cv.user_id}:pdf` ? "…" : "PDF"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadCvFile(cv.user_id, `${cv.first_name}_${cv.last_name}`, "word")}
+                            disabled={downloadingCvId === `${cv.user_id}:word`}
+                            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-teal-700 text-white hover:bg-teal-600 disabled:opacity-50 transition"
+                          >
+                            <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                            {downloadingCvId === `${cv.user_id}:word` ? "…" : "Word"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tablet / desktop: scrollable table */}
+                  <div className="hidden overflow-x-auto rounded-lg border border-slate-200 md:block">
+                    <table className="min-w-[720px] w-full divide-y divide-slate-200">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          {["Photo", "Name", "Top Skills", "Qualifications", "Updated", "Actions"].map((h) => (
+                            <th
+                              key={h}
+                              className="whitespace-nowrap px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
+                            >
+                              {h}
+                            </th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {cvs.map((cv) => (
+                          <tr key={cv.user_id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3">
+                              <CvSearchPhoto photoUrl={cv.profile_photo_url} name={`${cv.first_name} ${cv.last_name}`} />
+                            </td>
+                            <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">
+                              {cv.first_name} {cv.last_name}
+                            </td>
+                            <td className="max-w-[14rem] px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
+                              <span className="line-clamp-2 break-words">
+                                {cv.professional_skills?.map((s) => s.skill).filter(Boolean).join(", ") || "—"}
+                              </span>
+                            </td>
+                            <td className="max-w-[14rem] px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
+                              <span className="line-clamp-2 break-words">
+                                {cv.qualifications?.filter(Boolean).join(", ") || "—"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
+                              {formatDate(cv.updated_at)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => viewCv(cv.user_id)}
+                                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-primary border border-primary hover:bg-primary hover:text-white transition"
+                                >
+                                  View
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => downloadCvFile(cv.user_id, `${cv.first_name}_${cv.last_name}`, "pdf")}
+                                  disabled={downloadingCvId === `${cv.user_id}:pdf`}
+                                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition"
+                                >
+                                  <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                                  {downloadingCvId === `${cv.user_id}:pdf` ? "…" : "PDF"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => downloadCvFile(cv.user_id, `${cv.first_name}_${cv.last_name}`, "word")}
+                                  disabled={downloadingCvId === `${cv.user_id}:word`}
+                                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-teal-700 text-white hover:bg-teal-600 disabled:opacity-50 transition"
+                                >
+                                  <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                                  {downloadingCvId === `${cv.user_id}:word` ? "…" : "Word"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
 
