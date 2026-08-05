@@ -600,10 +600,14 @@ export default function CVBuilder() {
       const safeExt = ["pdf", "docx", "doc", "odt", "rtf", "txt", "jpg", "jpeg", "png", "gif", "webp"].includes(rawExt)
         ? rawExt
         : "bin";
-      const res = await api.post("/cv/import", {
-        document,
-        filename: `document.${safeExt}`,
-      });
+      const res = await api.post(
+        "/cv/import",
+        {
+          document,
+          filename: `document.${safeExt}`,
+        },
+        { timeout: 300000 }
+      );
       const imported = normalizeCv(res.data?.cv);
       setForm((prev) => ({
         ...imported,
