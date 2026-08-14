@@ -341,6 +341,19 @@ const prepareFormForSave = (form) => {
   };
 };
 
+const pollCvImportJob = async (jobId) => {
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const res = await api.get(`/cv/import/${jobId}`, { timeout: 20000 });
+    const payload = res.data || {};
+    if (payload.status && payload.status !== "processing") {
+      return payload;
+    }
+  }
+  throw new Error("CV import timed out. Please try again, or use a text-based Word/PDF export.");
+};
+
 const cvApiError = (err, fallback) => {
   if (err?.response?.status === 428) {
     return { message: getApiError(err, FACE_REQUIRED_MESSAGE), faceRequired: true };
@@ -606,15 +619,22 @@ export default function CVBuilder() {
           document,
           filename: `document.${safeExt}`,
         },
-        { timeout: 300000 }
+        { timeout: 60000 }
       );
-      const imported = normalizeCv(res.data?.cv);
+      let payload = res.data || {};
+      if (payload.job_id && payload.status === "processing") {
+        payload = await pollCvImportJob(payload.job_id);
+      }
+      if (payload.status === "error") {
+        throw Object.assign(new Error(payload.error || "Could not import CV."), { response: { data: payload } });
+      }
+      const imported = normalizeCv(payload.cv);
       setForm((prev) => ({
         ...imported,
         profile_photo_url: prev.profile_photo_url || imported.profile_photo_url,
       }));
-      setImportWarnings(Array.isArray(res.data?.warnings) ? res.data.warnings : []);
-      setMessage(res.data?.message || "CV imported. Review each step and save when ready.");
+      setImportWarnings(Array.isArray(payload.warnings) ? payload.warnings : []);
+      setMessage(payload.message || "CV imported. Review each step and save when ready.");
       setStep(1);
     } catch (err) {
       const { message, faceRequired: needsFace, consentRequired } = cvApiError(
