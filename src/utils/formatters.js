@@ -73,6 +73,7 @@ export function statusTone(status) {
     case "unhealthy":
     case "not_configured":
     case "closed":
+    case "disabled":
       return "status-pill-error";
     case "draft":
     case "past":

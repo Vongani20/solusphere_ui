@@ -10,6 +10,8 @@ import {
   PhoneIcon,
   PhotoIcon,
   PlusIcon,
+  NoSymbolIcon,
+  CheckCircleIcon,
   ShieldCheckIcon,
   TicketIcon,
   TrashIcon,
@@ -66,6 +68,7 @@ export default function Admin() {
   const [editingUserID, setEditingUserID] = useState(null);
   const [savingUser, setSavingUser] = useState(false);
   const [deletingUserID, setDeletingUserID] = useState(null);
+  const [togglingDisabledUserID, setTogglingDisabledUserID] = useState(null);
 
   const [eventForm, setEventForm] = useState(emptyEventForm);
   const [editingEventID, setEditingEventID] = useState(null);
@@ -438,6 +441,30 @@ export default function Admin() {
     }
   };
 
+  const toggleUserDisabled = async (user) => {
+    const nextDisabled = !user.is_disabled;
+    const action = nextDisabled ? "Disable" : "Enable";
+    if (!window.confirm(`${action} ${user.username}?`)) return;
+    setTogglingDisabledUserID(user.id);
+    setError("");
+    setMessage("");
+
+    try {
+      const res = await api.patch(`/admin/users/${user.id}/disabled`, {
+        is_disabled: nextDisabled,
+      });
+      const savedUser = res.data.user;
+      if (savedUser) {
+        setUsers((items) => items.map((item) => (item.id === savedUser.id ? savedUser : item)));
+      }
+      showSuccess(nextDisabled ? "User disabled." : "User enabled.");
+    } catch (err) {
+      showError(err, nextDisabled ? "Failed to disable user." : "Failed to enable user.");
+    } finally {
+      setTogglingDisabledUserID(null);
+    }
+  };
+
   const resetEventForm = () => {
     setEventForm(emptyEventForm);
     setEditingEventID(null);
@@ -757,12 +784,16 @@ export default function Admin() {
                       key={user.id}
                       title={user.username}
                       detail={user.email}
-                      meta={titleize(user.role)}
-                      statusKey={user.role}
+                      meta={user.is_disabled ? "Disabled" : titleize(user.role)}
+                      statusKey={user.is_disabled ? "disabled" : user.role}
                       subDetail={user.phone_number || user.auth_provider || "No phone"}
                       placeholderIcon={UserIcon}
                       onEdit={() => editUser(user)}
                       onViewLogins={() => viewUserLoginHistory(user)}
+                      onToggleDisabled={() => toggleUserDisabled(user)}
+                      disabled={!!user.is_disabled}
+                      togglingDisabled={togglingDisabledUserID === user.id}
+                      disableToggleDisabled={profile?.id === user.id}
                       onDelete={() => deleteUser(user)}
                       deleting={deletingUserID === user.id}
                       deleteDisabled={profile?.id === user.id}
@@ -1705,6 +1736,10 @@ function RecordRow({
   placeholderIcon: PlaceholderIcon = PhotoIcon,
   onEdit,
   onViewLogins,
+  onToggleDisabled,
+  disabled = false,
+  togglingDisabled = false,
+  disableToggleDisabled = false,
   onDelete,
   deleting,
   deleteDisabled = false,
@@ -1740,6 +1775,22 @@ function RecordRow({
             title="View login history"
           >
             <ClockIcon className="h-5 w-5" />
+          </button>
+        )}
+        {onToggleDisabled && (
+          <button
+            type="button"
+            onClick={onToggleDisabled}
+            disabled={togglingDisabled || disableToggleDisabled}
+            className={`rounded-lg p-2 disabled:cursor-not-allowed disabled:opacity-40 ${
+              disabled
+                ? "text-emerald-700 hover:bg-emerald-50"
+                : "text-amber-700 hover:bg-amber-50"
+            }`}
+            aria-label={disabled ? "Enable user" : "Disable user"}
+            title={disabled ? "Enable user" : "Disable user"}
+          >
+            {disabled ? <CheckCircleIcon className="h-5 w-5" /> : <NoSymbolIcon className="h-5 w-5" />}
           </button>
         )}
         <button type="button" onClick={onEdit} className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-primary" aria-label="Edit">
