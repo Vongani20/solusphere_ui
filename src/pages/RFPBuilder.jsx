@@ -14,6 +14,7 @@ import DocumentConsentModal from "../components/DocumentConsentModal";
 import api, { getApiError } from "../services/api";
 import { useDocumentProcessingConsent } from "../hooks/useDocumentProcessingConsent";
 import { formatDate } from "../utils/formatters";
+import { blobToBase64 } from "../utils/faceCapture";
 
 const ACCEPT =
   ".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
@@ -31,6 +32,33 @@ const STATUS_LABELS = {
   review: "Needs review",
   failed: "Failed",
 };
+
+const MAX_FILE_BYTES = 15 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 45 * 1024 * 1024;
+
+// Corporate proxies block multipart file uploads, so files go up as base64 JSON
+// (same approach as CV import). The filename only carries the extension.
+async function filesToPayload(list) {
+  const files = [...list];
+  if (files.length > 12) throw new Error("You can add up to 12 documents.");
+  let total = 0;
+  for (const file of files) {
+    if (file.size > MAX_FILE_BYTES) throw new Error(`${file.name} is larger than 15 MB.`);
+    total += file.size;
+  }
+  if (total > MAX_TOTAL_BYTES) throw new Error("Keep the combined upload under 45 MB.");
+  const documents = await Promise.all(
+    files.map(async (file) => {
+      const ext = (file.name?.match(/\.([a-z0-9]+)$/i)?.[1] || "pdf").toLowerCase();
+      return {
+        filename: `document.${ext}`,
+        display_name: file.name.replace(/\.[^.]+$/, ""),
+        document: await blobToBase64(file),
+      };
+    })
+  );
+  return { documents };
+}
 
 const emptySolution = { summary: "", approach: [], whyItFits: [], team: [], risks: [] };
 
@@ -117,9 +145,8 @@ export default function RFPBuilder() {
     if (!files.length) return;
     setUploading(true);
     resetFeedback();
-    const body = new FormData();
-    files.forEach((file) => body.append("files", file));
     try {
+      const body = await filesToPayload(files);
       const res = await api.post("/rfp/documents", body, { timeout: 180000 });
       setFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -225,9 +252,8 @@ export default function RFPBuilder() {
     withConsent(async () => {
       setBusy("add");
       resetFeedback();
-      const body = new FormData();
-      incoming.forEach((file) => body.append("files", file));
       try {
+        const body = await filesToPayload(incoming);
         const res = await api.post(`/rfp/documents/${selected.id}/sources`, body, { timeout: 180000 });
         setSelected(res.data);
         setDirty(false);
