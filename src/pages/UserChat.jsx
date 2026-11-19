@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowPathIcon,
   ChatBubbleLeftRightIcon,
+  FaceSmileIcon,
   MicrophoneIcon,
   PaperAirplaneIcon,
   PhoneIcon,
   PhotoIcon,
   StopIcon,
+  UserGroupIcon,
   UserIcon,
   VideoCameraIcon,
   PhoneXMarkIcon,
@@ -14,6 +16,9 @@ import {
 import DashboardLayout from "../components/DashboardLayout";
 import { AvatarWithPresence, PresenceIndicator } from "../components/PresenceIndicator";
 import UserAvatar from "../components/UserAvatar";
+import EmojiPicker from "../components/EmojiPicker";
+import GroupCallPicker from "../components/GroupCallPicker";
+import { GROUP_CALL_MAX, useGroupCall } from "../context/GroupCallContext";
 import { useCall } from "../context/CallContext";
 import api, { getApiError, getStoredUser } from "../services/api";
 import { resolveImageUrl } from "../utils/assets";
@@ -47,45 +52,161 @@ function conversationPreviewIcon(type) {
   }
 }
 
-function ChatMessageBubble({ message, ownMessage, currentUser }) {
+const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|‍|️|\s)+$/u;
+
+function isEmojiOnly(text) {
+  if (!text || !EMOJI_ONLY.test(text)) return false;
+  const count = [...text.matchAll(/\p{Extended_Pictographic}/gu)].length;
+  return count > 0 && count <= 3;
+}
+
+function groupReactions(reactions = [], currentUserId) {
+  const groups = new Map();
+  for (const reaction of reactions) {
+    const group = groups.get(reaction.emoji) || { emoji: reaction.emoji, count: 0, names: [], mine: false };
+    group.count += 1;
+    group.names.push(reaction.user_id === currentUserId ? "You" : reaction.username);
+    if (reaction.user_id === currentUserId) group.mine = true;
+    groups.set(reaction.emoji, group);
+  }
+  return [...groups.values()];
+}
+
+function formatTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function ReadReceipt({ message, onLightBackground }) {
+  if (message.read_at) {
+    return (
+      <span
+        className={`inline-flex items-center font-semibold ${onLightBackground ? "text-sky-600" : "text-sky-200"}`}
+        title={`Seen by ${message.receiver_username} · ${formatDate(message.read_at)}`}
+      >
+        <span aria-hidden="true" className="tracking-[-0.3em]">✓✓</span>
+        <span className="ml-1.5">Seen {formatTime(message.read_at)}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1" title="Sent · not seen yet">
+      <span aria-hidden="true">✓</span>
+      <span>Sent</span>
+    </span>
+  );
+}
+
+function ChatMessageBubble({ message, ownMessage, currentUser, onReact }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const reactButtonRef = useRef(null);
   const sender = { username: message.sender_username };
   const attachmentUrl = resolveImageUrl(message.attachment_url);
+  const emojiOnly = (message.message_type || "text") === "text" && isEmojiOnly(message.message);
+  const reactionGroups = groupReactions(message.reactions, currentUser?.id);
+
+  const react = (emoji) => {
+    setPickerOpen(false);
+    onReact?.(message, emoji);
+  };
 
   return (
-    <div className={`flex items-end gap-3 ${ownMessage ? "justify-end" : "justify-start"}`}>
+    <div className={`group flex items-end gap-3 ${ownMessage ? "justify-end" : "justify-start"}`}>
       {!ownMessage && <UserAvatar user={sender} className="h-9 w-9" iconClassName="h-5 w-5" />}
-      <div
-        className={`max-w-[82%] rounded-lg px-4 py-3 ${
-          ownMessage ? "bg-primary text-white" : "bg-slate-100 text-slate-900"
-        }`}
-      >
-        <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-xs font-bold">{sender.username}</span>
+      <div className={`flex max-w-[82%] items-center gap-1 ${ownMessage ? "flex-row-reverse" : ""}`}>
+        <div className="min-w-0">
+          <div
+            className={`rounded-lg ${
+              emojiOnly
+                ? "bg-transparent px-1 py-1"
+                : ownMessage
+                  ? "bg-primary px-4 py-3 text-white"
+                  : "bg-slate-100 px-4 py-3 text-slate-900"
+            }`}
+          >
+            {!emojiOnly ? (
+              <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-xs font-bold">{sender.username}</span>
+              </div>
+            ) : null}
+
+            {message.message_type === "image" && attachmentUrl ? (
+              <a href={attachmentUrl} target="_blank" rel="noreferrer" className="block">
+                <img
+                  src={attachmentUrl}
+                  alt={message.message || "Shared image"}
+                  className="max-h-72 w-full rounded-md object-cover"
+                />
+              </a>
+            ) : null}
+
+            {message.message_type === "voice" && attachmentUrl ? (
+              <audio controls preload="metadata" className="w-full max-w-sm">
+                <source src={attachmentUrl} type={message.attachment_mime || "audio/webm"} />
+              </audio>
+            ) : null}
+
+            {message.message ? (
+              <p className={`whitespace-pre-wrap break-words ${emojiOnly ? "text-4xl leading-tight" : "text-sm"}`}>
+                {message.message}
+              </p>
+            ) : null}
+
+            <p
+              className={`mt-2 flex flex-wrap items-center gap-x-2 text-[11px] ${
+                emojiOnly || !ownMessage ? "text-slate-500" : "text-white/75"
+              } ${ownMessage ? "justify-end" : ""}`}
+            >
+              <span>{formatDate(message.created_at)}</span>
+              {ownMessage ? <ReadReceipt message={message} onLightBackground={emojiOnly} /> : null}
+            </p>
+          </div>
+
+          {reactionGroups.length ? (
+            <div className={`-mt-1.5 flex flex-wrap gap-1 px-2 ${ownMessage ? "justify-end" : ""}`}>
+              {reactionGroups.map((group) => (
+                <button
+                  key={group.emoji}
+                  type="button"
+                  onClick={() => react(group.emoji)}
+                  title={`${group.names.join(", ")} reacted ${group.emoji}`}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm shadow-sm transition ${
+                    group.mine
+                      ? "border-primary/40 bg-sky-50 text-primary-dark"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="leading-none">{group.emoji}</span>
+                  {group.count > 1 ? <span className="text-xs font-semibold">{group.count}</span> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
-        {message.message_type === "image" && attachmentUrl ? (
-          <a href={attachmentUrl} target="_blank" rel="noreferrer" className="block">
-            <img
-              src={attachmentUrl}
-              alt={message.message || "Shared image"}
-              className="max-h-72 w-full rounded-md object-cover"
+        <div className="shrink-0 self-center">
+          <button
+            ref={reactButtonRef}
+            type="button"
+            onClick={() => setPickerOpen((open) => !open)}
+            className="rounded-full p-1.5 text-slate-400 opacity-60 transition hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+            aria-label="React to message"
+            title="React"
+          >
+            <FaceSmileIcon className="h-5 w-5" />
+          </button>
+          {pickerOpen ? (
+            <EmojiPicker
+              quick
+              anchorRef={reactButtonRef}
+              align={ownMessage ? "right" : "left"}
+              onSelect={react}
+              onClose={() => setPickerOpen(false)}
             />
-          </a>
-        ) : null}
-
-        {message.message_type === "voice" && attachmentUrl ? (
-          <audio controls preload="metadata" className="w-full max-w-sm">
-            <source src={attachmentUrl} type={message.attachment_mime || "audio/webm"} />
-          </audio>
-        ) : null}
-
-        {message.message ? (
-          <p className="whitespace-pre-wrap break-words text-sm">{message.message}</p>
-        ) : null}
-
-        <p className={`mt-2 text-[11px] ${ownMessage ? "text-white/75" : "text-slate-500"}`}>
-          {formatDate(message.created_at)}
-        </p>
+          ) : null}
+        </div>
       </div>
       {ownMessage ? <UserAvatar user={currentUser} className="h-9 w-9" iconClassName="h-5 w-5" /> : null}
     </div>
@@ -103,6 +224,9 @@ export default function UserChat() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false);
+  const { startGroupCall, inGroupCall, groupBusy } = useGroupCall();
   const [error, setError] = useState("");
   const [chatError, setChatError] = useState("");
   const currentUser = getStoredUser();
@@ -119,6 +243,7 @@ export default function UserChat() {
   } = useCall();
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
+  const draftInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const voiceChunksRef = useRef([]);
 
@@ -301,6 +426,39 @@ export default function UserChat() {
     }
   };
 
+  const insertEmoji = (emoji) => {
+    const input = draftInputRef.current;
+    const start = input?.selectionStart ?? draft.length;
+    const end = input?.selectionEnd ?? draft.length;
+    setDraft(draft.slice(0, start) + emoji + draft.slice(end));
+    window.requestAnimationFrame(() => {
+      if (!input) return;
+      input.focus();
+      const caret = start + emoji.length;
+      input.setSelectionRange(caret, caret);
+    });
+  };
+
+  const reactToMessage = async (message, emoji) => {
+    const previous = message.reactions || [];
+    const mine = previous.find((item) => item.user_id === currentUser?.id);
+    const optimistic = previous.filter((item) => item.user_id !== currentUser?.id);
+    if (!mine || mine.emoji !== emoji) {
+      optimistic.push({ user_id: currentUser?.id, username: currentUser?.username || "You", emoji });
+    }
+    const setReactions = (reactions) =>
+      setMessages((items) => items.map((item) => (item.id === message.id ? { ...item, reactions } : item)));
+
+    setReactions(optimistic);
+    try {
+      const res = await api.post(`/chats/messages/${message.id}/reactions`, { emoji });
+      setReactions(res.data.reactions || []);
+    } catch (err) {
+      setReactions(previous);
+      setChatError(getApiError(err, "Could not add reaction."));
+    }
+  };
+
   const sendAttachment = async (file, messageType, caption = "") => {
     if (!activeUserID || sending) return;
 
@@ -411,6 +569,16 @@ export default function UserChat() {
               <ArrowPathIcon className={`h-5 w-5 ${loadingSidebar ? "animate-spin" : ""}`} />
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setGroupPickerOpen(true)}
+            disabled={inCall || inGroupCall || groupBusy}
+            className="btn btn-secondary mb-5 inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <UserGroupIcon className="h-5 w-5" />
+            Start a group call
+          </button>
 
           {error ? (
             <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800">
@@ -573,7 +741,7 @@ export default function UserChat() {
                   <button
                     type="button"
                     onClick={() => startCall(activeUserID, "audio")}
-                    disabled={inCall || callBusy}
+                    disabled={inCall || callBusy || inGroupCall}
                     title={activeUser?.is_online ? "Start voice call" : "User is offline — call may not be answered"}
                     className="btn btn-secondary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label="Start voice call"
@@ -584,7 +752,7 @@ export default function UserChat() {
                   <button
                     type="button"
                     onClick={() => startCall(activeUserID, "video")}
-                    disabled={inCall || callBusy}
+                    disabled={inCall || callBusy || inGroupCall}
                     title={activeUser?.is_online ? "Start video call" : "User is offline — call may not be answered"}
                     className="btn btn-secondary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label="Start video call"
@@ -653,6 +821,7 @@ export default function UserChat() {
                       message={message}
                       ownMessage={message.sender_id === currentUser?.id}
                       currentUser={currentUser}
+                      onReact={reactToMessage}
                     />
                   ))
                 )}
@@ -688,7 +857,21 @@ export default function UserChat() {
                   >
                     {recording ? <StopIcon className="h-5 w-5" /> : <MicrophoneIcon className="h-5 w-5" />}
                   </button>
+                  <div className="relative flex">
+                    <button
+                      type="button"
+                      onClick={() => setEmojiOpen((open) => !open)}
+                      disabled={sending || recording}
+                      className="btn btn-secondary inline-flex items-center justify-center px-3 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label="Add emoji"
+                      aria-expanded={emojiOpen}
+                    >
+                      <FaceSmileIcon className="h-5 w-5" />
+                    </button>
+                    {emojiOpen ? <EmojiPicker onSelect={insertEmoji} onClose={() => setEmojiOpen(false)} /> : null}
+                  </div>
                   <input
+                    ref={draftInputRef}
                     type="text"
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
@@ -719,6 +902,18 @@ export default function UserChat() {
           )}
         </section>
       </div>
+      {groupPickerOpen ? (
+        <GroupCallPicker
+          showCallType
+          maxSelectable={GROUP_CALL_MAX - 1}
+          confirmLabel="Start call"
+          onClose={() => setGroupPickerOpen(false)}
+          onConfirm={(ids, type) => {
+            setGroupPickerOpen(false);
+            startGroupCall(ids, type);
+          }}
+        />
+      ) : null}
     </DashboardLayout>
   );
 }

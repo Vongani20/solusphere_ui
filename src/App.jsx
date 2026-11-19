@@ -21,6 +21,7 @@ import AdminRoute from "./components/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { CallProvider } from "./context/CallContext";
+import { GroupCallProvider } from "./context/GroupCallContext";
 import usePresenceHeartbeat from "./hooks/usePresenceHeartbeat";
 
 function AppShell({ children }) {
@@ -35,6 +36,7 @@ function App() {
     <Router>
       <ErrorBoundary>
         <CallProvider>
+        <GroupCallProvider>
         <AppShell>
         <Routes>
         <Route path="/" element={<Navigate to={defaultRoute} replace />} />
@@ -151,6 +153,7 @@ function App() {
         <Route path="*" element={<Navigate to={defaultRoute} replace />} />
         </Routes>
         </AppShell>
+        </GroupCallProvider>
         </CallProvider>
       </ErrorBoundary>
     </Router>

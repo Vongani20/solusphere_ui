@@ -24,7 +24,7 @@ const FALLBACK_ICE_SERVERS = [
 // without a frontend release. Cached until shortly before they expire.
 let iceServerCache = { servers: null, expiresAt: 0 };
 
-async function getIceServers() {
+export async function getIceServers() {
   if (iceServerCache.servers && Date.now() < iceServerCache.expiresAt) {
     return iceServerCache.servers;
   }
@@ -44,7 +44,7 @@ async function getIceServers() {
   }
 }
 
-const AUDIO_CONSTRAINTS = {
+export const AUDIO_CONSTRAINTS = {
   echoCancellation: true,
   noiseSuppression: true,
   autoGainControl: true,
