@@ -16,6 +16,8 @@ const uploadPaths = [
   "/api/cv/photo",
   "/api/bpo/analyze-pdf",
   "/api/upload",
+  // RFP Builder: POST /api/rfp/documents and /api/rfp/documents/:id/sources carry tender PDFs/Word files.
+  "/api/rfp/documents",
 ];
 
 function run(command, args) {

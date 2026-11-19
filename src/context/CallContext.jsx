@@ -16,25 +16,39 @@ import UserAvatar from "../components/UserAvatar";
 
 const CallContext = createContext(null);
 
-const ICE_SERVERS = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-  {
-    urls: "turn:openrelay.metered.ca:80",
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
-  {
-    urls: "turn:openrelay.metered.ca:443",
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
-  {
-    urls: "turn:openrelay.metered.ca:443?transport=tcp",
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
+const FALLBACK_ICE_SERVERS = [
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
 ];
+
+// TURN credentials come from the backend (GET /calls/ice-servers) so they can be rotated
+// without a frontend release. Cached until shortly before they expire.
+let iceServerCache = { servers: null, expiresAt: 0 };
+
+async function getIceServers() {
+  if (iceServerCache.servers && Date.now() < iceServerCache.expiresAt) {
+    return iceServerCache.servers;
+  }
+  try {
+    const res = await api.get("/calls/ice-servers", { timeout: 4000 });
+    const servers = Array.isArray(res.data?.iceServers) && res.data.iceServers.length
+      ? res.data.iceServers
+      : FALLBACK_ICE_SERVERS;
+    const ttlMs = Math.max(60, (res.data?.ttlSeconds || 3600) - 600) * 1000;
+    iceServerCache = { servers, expiresAt: Date.now() + ttlMs };
+    if (!res.data?.turnConfigured) {
+      console.warn("Calls: no TURN relay configured; calls across strict NAT/firewalls may fail.");
+    }
+    return servers;
+  } catch {
+    return FALLBACK_ICE_SERVERS;
+  }
+}
+
+const AUDIO_CONSTRAINTS = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+};
 
 function prepareSdpForSignaling(sdp) {
   if (!sdp || typeof sdp !== "string") return sdp;
@@ -51,39 +65,42 @@ function prepareSdpForSignaling(sdp) {
   return `${lines.join("\r\n")}\r\n`;
 }
 
-function waitForIceGathering(pc, timeoutMs = 5000) {
-  return new Promise((resolve) => {
-    if (pc.iceGatheringState === "complete") {
-      resolve();
-      return;
-    }
-
-    const timer = window.setTimeout(resolve, timeoutMs);
-    const onStateChange = () => {
-      if (pc.iceGatheringState === "complete") {
-        window.clearTimeout(timer);
-        pc.removeEventListener("icegatheringstatechange", onStateChange);
-        resolve();
-      }
-    };
-
-    pc.addEventListener("icegatheringstatechange", onStateChange);
-  });
-}
-
 function peerLabel(call, currentUserId) {
   if (!call) return "User";
   if (call.caller_id === currentUserId) return call.callee_username || "User";
   return call.caller_username || "User";
 }
 
-function MediaTile({ stream, muted = false, label, className = "" }) {
-  const videoRef = useRef(null);
+function MediaTile({ stream, label, className = "" }) {
+  const [, forceRender] = useState(0);
+  const videoRef = useCallback(
+    (video) => {
+      if (!video) return;
+      if (video.srcObject !== stream) video.srcObject = stream || null;
+      video.play?.().catch(() => {});
+    },
+    [stream]
+  );
 
+  // Re-render when a remote video track starts or stops sending frames.
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.srcObject = stream || null;
+    if (!stream) return undefined;
+    const bump = () => forceRender((n) => n + 1);
+    const tracks = stream.getVideoTracks();
+    tracks.forEach((track) => {
+      track.addEventListener("unmute", bump);
+      track.addEventListener("mute", bump);
+      track.addEventListener("ended", bump);
+    });
+    stream.addEventListener?.("addtrack", bump);
+    return () => {
+      tracks.forEach((track) => {
+        track.removeEventListener("unmute", bump);
+        track.removeEventListener("mute", bump);
+        track.removeEventListener("ended", bump);
+      });
+      stream.removeEventListener?.("addtrack", bump);
+    };
   }, [stream]);
 
   if (!stream) {
@@ -109,7 +126,7 @@ function MediaTile({ stream, muted = false, label, className = "" }) {
       ref={videoRef}
       autoPlay
       playsInline
-      muted={muted}
+      muted
       className={`bg-slate-900 object-cover ${className}`}
     />
   );
@@ -338,15 +355,35 @@ function CallOverlay({
     callSession?.caller_id === currentUser?.id
       ? { username: callSession?.callee_username }
       : { username: callSession?.caller_username };
-  const remoteAudioRef = useRef(null);
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const audioElRef = useRef(null);
+
+  const playRemoteAudio = useCallback(() => {
+    const audio = audioElRef.current;
+    if (!audio || !audio.srcObject) return;
+    audio
+      .play()
+      .then(() => setAudioBlocked(false))
+      .catch((err) => {
+        // Autoplay policy: the browser needs a user gesture before it plays sound.
+        if (err?.name === "NotAllowedError") setAudioBlocked(true);
+      });
+  }, []);
+
+  // Callback ref: attaches the remote stream whenever the <audio> element mounts,
+  // so audio is never lost if the stream arrives before the element exists.
+  const remoteAudioRef = useCallback(
+    (audio) => {
+      audioElRef.current = audio;
+      if (!audio) return;
+      if (audio.srcObject !== remoteStream) audio.srcObject = remoteStream || null;
+      if (remoteStream) playRemoteAudio();
+    },
+    [remoteStream, playRemoteAudio]
+  );
 
   useEffect(() => {
-    const audio = remoteAudioRef.current;
-    if (!audio) return;
-    audio.srcObject = remoteStream || null;
-    if (remoteStream) {
-      audio.play().catch(() => {});
-    }
+    if (!remoteStream) setAudioBlocked(false);
   }, [remoteStream]);
 
   if (callPhase === "idle") return null;
@@ -359,6 +396,8 @@ function CallOverlay({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md">
+      {/* Always mounted while a call UI is shown, for audio and video calls alike. */}
+      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
       <div
         className={`w-full max-w-lg overflow-hidden rounded-3xl border shadow-2xl ${
           isIncoming ? "border-emerald-400 bg-gradient-to-b from-emerald-950 to-slate-950" : "border-slate-700 bg-slate-950"
@@ -369,7 +408,6 @@ function CallOverlay({
             <MediaTile stream={remoteStream} label={`${label} camera off`} className="h-full w-full" />
             <MediaTile
               stream={localStream}
-              muted
               label="You"
               className="absolute bottom-4 right-4 h-28 w-40 rounded-lg border border-white/20 shadow-lg"
             />
@@ -402,11 +440,18 @@ function CallOverlay({
             {callPhase === "preparing" ? (
               <p className="mt-2 text-sm text-slate-400">Allow microphone access to continue...</p>
             ) : null}
-            {!isVideo && showActiveMedia ? (
-              <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-            ) : null}
           </div>
         )}
+
+        {audioBlocked && showActiveMedia ? (
+          <button
+            type="button"
+            onClick={playRemoteAudio}
+            className="w-full border-t border-amber-500/30 bg-amber-900/40 px-6 py-3 text-sm font-semibold text-amber-100 hover:bg-amber-900/60"
+          >
+            Your browser paused the call audio. Tap here to hear {label || "the other person"}.
+          </button>
+        ) : null}
 
         {callError ? (
           <div className="border-t border-rose-500/30 bg-rose-950/40 px-6 py-3 text-sm font-medium text-rose-200">
@@ -524,7 +569,9 @@ export function CallProvider({ children }) {
       throw new Error("This browser does not support camera or microphone access.");
     }
     const constraints =
-      type === "video" ? { audio: true, video: { facingMode: "user" } } : { audio: true, video: false };
+      type === "video"
+        ? { audio: AUDIO_CONSTRAINTS, video: { facingMode: "user" } }
+        : { audio: AUDIO_CONSTRAINTS, video: false };
     return navigator.mediaDevices.getUserMedia(constraints);
   }, []);
 
@@ -568,7 +615,6 @@ export function CallProvider({ children }) {
       pc.ontrack = (event) => {
         const remote = event.streams?.[0] || new MediaStream([event.track]);
         setRemoteStream(remote);
-        setCallPhase((phase) => (phase === "connecting" || phase === "outgoing" ? "active" : phase));
       };
 
       pc.oniceconnectionstatechange = () => {
@@ -576,8 +622,10 @@ export function CallProvider({ children }) {
         if (state === "connected" || state === "completed") {
           setCallPhase("active");
           setCallError("");
+        } else if (state === "disconnected") {
+          setCallError("Connection unstable — trying to reconnect…");
         } else if (state === "failed" && remoteDescriptionSetRef.current) {
-          setCallError("Call connection failed. Check your network and try again.");
+          setCallError("Could not connect the call audio. One of you may be on a network that blocks calls; try another network.");
           setCallPhase("ended");
           stopPolling();
         }
@@ -678,7 +726,8 @@ export function CallProvider({ children }) {
               type: "answer",
               sdp: prepareSdpForSignaling(call.answer_sdp),
             });
-            setCallPhase("active");
+            // Stay "connecting" until ICE reports connected (see oniceconnectionstatechange).
+            setCallPhase((phase) => (phase === "active" ? phase : "connecting"));
           }
 
           if (["rejected", "ended", "missed"].includes(call.status)) {
@@ -696,18 +745,6 @@ export function CallProvider({ children }) {
     [ingestCandidates, setRemoteDescription, stopPolling]
   );
 
-  const createPeerConnection = useCallback(
-    (callId, stream) => {
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-      attachPeerHandlers(pc);
-      pcRef.current = pc;
-      callIdRef.current = callId;
-      return pc;
-    },
-    [attachPeerHandlers]
-  );
-
   const startCall = useCallback(
     async (peerUserId, type = "audio") => {
       if (!peerUserId || (callPhase !== "idle" && callPhase !== "ended")) return;
@@ -718,18 +755,17 @@ export function CallProvider({ children }) {
       resetPeerState();
 
       try {
-        const stream = await getMedia(type);
+        const [stream, iceServers] = await Promise.all([getMedia(type), getIceServers()]);
         localStreamRef.current = stream;
         setLocalStream(stream);
 
-        const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+        const pc = new RTCPeerConnection({ iceServers });
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
         attachPeerHandlers(pc);
         pcRef.current = pc;
 
         const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: type === "video" });
         await pc.setLocalDescription(offer);
-        await waitForIceGathering(pc);
         const offerSdp = prepareSdpForSignaling(pc.localDescription?.sdp || offer.sdp);
 
         const res = await api.post(`/chats/${peerUserId}/calls`, {
@@ -788,11 +824,11 @@ export function CallProvider({ children }) {
       setCallSession(freshCall);
       resetPeerState();
 
-      const stream = await getMedia(mediaType);
+      const [stream, iceServers] = await Promise.all([getMedia(mediaType), getIceServers()]);
       localStreamRef.current = stream;
       setLocalStream(stream);
 
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const pc = new RTCPeerConnection({ iceServers });
       attachPeerHandlers(pc);
       pcRef.current = pc;
       callIdRef.current = callId;
@@ -806,7 +842,6 @@ export function CallProvider({ children }) {
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      await waitForIceGathering(pc);
       const answerSdp = prepareSdpForSignaling(pc.localDescription?.sdp || answer.sdp);
 
       const res = await api.post(`/chats/calls/${callId}/accept`, {
@@ -816,7 +851,7 @@ export function CallProvider({ children }) {
       await flushLocalCandidates();
 
       setCallSession(res.data.call);
-      setCallPhase("active");
+      setCallPhase((phase) => (phase === "active" ? phase : "connecting"));
       startPolling(callId, "callee");
     } catch (err) {
       cleanupMedia();

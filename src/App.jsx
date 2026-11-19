@@ -15,6 +15,7 @@ import HelpDesk from "./pages/helpdesk";
 import Chatbot from "./pages/Chatbot";
 import UpdatePassword from "./pages/UpdatePassword";
 import CVBuilder from "./pages/CVBuilder";
+import RFPBuilder from "./pages/RFPBuilder";
 import Innovation from "./pages/Innovation";
 import AdminRoute from "./components/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -126,6 +127,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Innovation />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/rfp-builder"
+          element={
+            <ProtectedRoute>
+              <RFPBuilder />
             </ProtectedRoute>
           }
         />
