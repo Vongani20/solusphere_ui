@@ -9,7 +9,8 @@ import {
 import DashboardLayout from "../components/DashboardLayout";
 import DocumentConsentModal from "../components/DocumentConsentModal";
 import api, { getApiError } from "../services/api";
-import { useDocumentProcessingConsent } from "../hooks/useDocumentProcessingConsent";
+import { useDocumentProcessingConsent } from "../hooks/useDocumentProcessingConsent";
+import ResponsiveTable from "../components/ResponsiveTable";
 import {
   formatDate,
   formatFileSize,
@@ -266,6 +267,7 @@ export default function BPOAnalysis() {
 
             <div className="overflow-hidden rounded-lg border border-slate-200">
               <div className="overflow-x-auto">
+                <ResponsiveTable>
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
@@ -322,6 +324,7 @@ export default function BPOAnalysis() {
                     )}
                   </tbody>
                 </table>
+</ResponsiveTable>
               </div>
             </div>
 

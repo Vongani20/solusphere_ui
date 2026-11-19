@@ -21,7 +21,8 @@ import {
 import DashboardLayout from "../components/DashboardLayout";
 import api, { getApiError, saveSession } from "../services/api";
 import { resolveImageUrl } from "../utils/assets";
-import { formatDate, formatDateOnly, statusTone, titleize } from "../utils/formatters";
+import { formatDate, formatDateOnly, statusTone, titleize } from "../utils/formatters";
+import ResponsiveTable from "../components/ResponsiveTable";
 
 const emptyUserForm = {
   username: "",
@@ -1058,6 +1059,7 @@ export default function Admin() {
                 />
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <ResponsiveTable>
                   <table className="min-w-full divide-y divide-slate-200">
                     <thead className="bg-slate-50">
                       <tr>
@@ -1095,6 +1097,7 @@ export default function Admin() {
                       ))}
                     </tbody>
                   </table>
+</ResponsiveTable>
                 </div>
               )}
             </DataCard>
@@ -1210,6 +1213,7 @@ export default function Admin() {
                 />
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <ResponsiveTable>
                   <table className="min-w-full divide-y divide-slate-200">
                     <thead className="bg-slate-50">
                       <tr>
@@ -1254,6 +1258,7 @@ export default function Admin() {
                       })}
                     </tbody>
                   </table>
+</ResponsiveTable>
                 </div>
               )}
             </DataCard>
@@ -1458,6 +1463,7 @@ export default function Admin() {
 
                   {/* Tablet / desktop: scrollable table */}
                   <div className="hidden overflow-x-auto rounded-lg border border-slate-200 md:block">
+                    <ResponsiveTable>
                     <table className="min-w-[720px] w-full divide-y divide-slate-200">
                       <thead className="bg-slate-50">
                         <tr>
@@ -1526,6 +1532,7 @@ export default function Admin() {
                         ))}
                       </tbody>
                     </table>
+</ResponsiveTable>
                   </div>
                 </>
               )}

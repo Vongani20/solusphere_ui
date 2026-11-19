@@ -7,7 +7,8 @@ import {
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
 import api, { getApiError } from "../services/api";
-import { formatDate, formatFileSize } from "../utils/formatters";
+import { formatDate, formatFileSize } from "../utils/formatters";
+import ResponsiveTable from "../components/ResponsiveTable";
 
 export default function FileUploads() {
   const [file, setFile] = useState(null);
@@ -106,6 +107,7 @@ export default function FileUploads() {
 
             <div className="overflow-hidden rounded-lg border border-slate-200">
               <div className="overflow-x-auto">
+                <ResponsiveTable>
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
@@ -151,6 +153,7 @@ export default function FileUploads() {
                     )}
                   </tbody>
                 </table>
+</ResponsiveTable>
               </div>
             </div>
           </div>

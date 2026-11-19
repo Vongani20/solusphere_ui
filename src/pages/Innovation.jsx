@@ -7,7 +7,8 @@ import DashboardLayout from "../components/DashboardLayout";
 import api, { getApiError, getStoredUser } from "../services/api";
 import { blobToBase64 } from "../utils/faceCapture";
 import { formatDate, titleize } from "../utils/formatters";
-import { resolveImageUrl } from "../utils/assets";
+import { resolveImageUrl } from "../utils/assets";
+import ResponsiveTable from "../components/ResponsiveTable";
 
 const emptyForm = {
   full_name: "",
@@ -278,6 +279,7 @@ export default function Innovation() {
           </div>
 
           <div className="overflow-x-auto">
+            <ResponsiveTable>
             <table className="min-w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
@@ -384,6 +386,7 @@ export default function Innovation() {
                 )}
               </tbody>
             </table>
+</ResponsiveTable>
           </div>
         </section>
         ) : null}

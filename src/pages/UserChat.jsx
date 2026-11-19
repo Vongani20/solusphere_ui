@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowPathIcon,
+  ChevronLeftIcon,
   ChatBubbleLeftRightIcon,
   FaceSmileIcon,
   MicrophoneIcon,
@@ -113,9 +114,13 @@ function ChatMessageBubble({ message, ownMessage, currentUser, onReact }) {
   };
 
   return (
-    <div className={`group flex items-end gap-3 ${ownMessage ? "justify-end" : "justify-start"}`}>
-      {!ownMessage && <UserAvatar user={sender} className="h-9 w-9" iconClassName="h-5 w-5" />}
-      <div className={`flex max-w-[82%] items-center gap-1 ${ownMessage ? "flex-row-reverse" : ""}`}>
+    <div className={`group flex items-end gap-2 sm:gap-3 ${ownMessage ? "justify-end" : "justify-start"}`}>
+      {!ownMessage ? (
+        <span className="hidden shrink-0 sm:block">
+          <UserAvatar user={sender} className="h-9 w-9" iconClassName="h-5 w-5" />
+        </span>
+      ) : null}
+      <div className={`flex min-w-0 max-w-[92%] items-center gap-1 sm:max-w-[82%] ${ownMessage ? "flex-row-reverse" : ""}`}>
         <div className="min-w-0">
           <div
             className={`rounded-lg ${
@@ -208,7 +213,11 @@ function ChatMessageBubble({ message, ownMessage, currentUser, onReact }) {
           ) : null}
         </div>
       </div>
-      {ownMessage ? <UserAvatar user={currentUser} className="h-9 w-9" iconClassName="h-5 w-5" /> : null}
+      {ownMessage ? (
+        <span className="hidden shrink-0 sm:block">
+          <UserAvatar user={currentUser} className="h-9 w-9" iconClassName="h-5 w-5" />
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -543,8 +552,10 @@ export default function UserChat() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto grid max-w-7xl gap-6 xl:grid-cols-[22rem_1fr]">
-        <section className="card h-fit">
+      <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
+        <section
+          className={`card min-w-0 lg:h-[calc(100dvh-7rem)] lg:overflow-y-auto ${activeUser ? "hidden lg:block" : ""}`}
+        >
           <div className="mb-5 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-900 text-white">
@@ -718,18 +729,30 @@ export default function UserChat() {
           </div>
         </section>
 
-        <section className="card flex min-h-[calc(100vh-8.5rem)] flex-col overflow-hidden">
+        <section
+          className={`card min-w-0 flex-col overflow-hidden !p-3 sm:!p-5 h-[calc(100dvh-6rem)] min-h-[26rem] sm:h-[calc(100dvh-7rem)] ${
+            activeUser ? "flex" : "hidden lg:flex"
+          }`}
+        >
           {activeUser ? (
             <>
-              <div className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
-                <div className="flex min-w-0 items-center gap-3">
+              <div className="mb-3 flex items-center justify-between gap-2 border-b border-slate-200 pb-3 sm:mb-5 sm:gap-3 sm:pb-4">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveUser(null)}
+                    className="-ml-1 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden"
+                    aria-label="Back to chats"
+                  >
+                    <ChevronLeftIcon className="h-6 w-6" />
+                  </button>
                   <AvatarWithPresence
                     user={activeUser}
                     avatar={<UserAvatar user={activeUser} className="h-11 w-11" iconClassName="h-6 w-6" />}
                   />
                   <div className="min-w-0">
-                    <h2 className="truncate text-xl font-bold text-slate-950">{activeDisplayName}</h2>
-                    <p className="text-sm text-slate-500">
+                    <h2 className="truncate text-base font-bold text-slate-950 sm:text-xl">{activeDisplayName}</h2>
+                    <p className="truncate text-xs text-slate-500 sm:text-sm">
                       <span className={activeUser?.is_online ? "font-semibold text-emerald-600" : ""}>
                         {formatPresenceLabel(activeUser)}
                       </span>
@@ -737,13 +760,13 @@ export default function UserChat() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1 sm:gap-2">
                   <button
                     type="button"
                     onClick={() => startCall(activeUserID, "audio")}
                     disabled={inCall || callBusy || inGroupCall}
                     title={activeUser?.is_online ? "Start voice call" : "User is offline — call may not be answered"}
-                    className="btn btn-secondary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="btn btn-secondary inline-flex items-center gap-2 px-2.5 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
                     aria-label="Start voice call"
                   >
                     <PhoneIcon className="h-5 w-5" />
@@ -754,7 +777,7 @@ export default function UserChat() {
                     onClick={() => startCall(activeUserID, "video")}
                     disabled={inCall || callBusy || inGroupCall}
                     title={activeUser?.is_online ? "Start video call" : "User is offline — call may not be answered"}
-                    className="btn btn-secondary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="btn btn-secondary inline-flex items-center gap-2 px-2.5 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
                     aria-label="Start video call"
                   >
                     <VideoCameraIcon className="h-5 w-5" />
@@ -809,7 +832,7 @@ export default function UserChat() {
                 </div>
               ) : null}
 
-              <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1">
                 {orderedMessages.length === 0 ? (
                   <div className="flex h-full min-h-64 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-medium text-slate-500">
                     {loadingMessages ? "Loading messages..." : "No messages yet. Say hello."}
@@ -828,8 +851,8 @@ export default function UserChat() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <form onSubmit={sendTextMessage} className="mt-5 border-t border-slate-200 pt-4">
-                <div className="flex gap-2">
+              <form onSubmit={sendTextMessage} className="mt-3 border-t border-slate-200 pt-3 sm:mt-5 sm:pt-4">
+                <div className="flex items-stretch gap-1.5 sm:gap-2">
                   <input
                     ref={imageInputRef}
                     type="file"
@@ -841,7 +864,7 @@ export default function UserChat() {
                     type="button"
                     onClick={() => imageInputRef.current?.click()}
                     disabled={sending || recording}
-                    className="btn btn-secondary inline-flex items-center justify-center px-3 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="btn btn-secondary inline-flex shrink-0 items-center justify-center px-2.5 disabled:cursor-not-allowed sm:px-3 disabled:opacity-50"
                     aria-label="Send image"
                   >
                     <PhotoIcon className="h-5 w-5" />
@@ -850,7 +873,7 @@ export default function UserChat() {
                     type="button"
                     onClick={recording ? stopRecording : startRecording}
                     disabled={sending}
-                    className={`btn inline-flex items-center justify-center px-3 disabled:cursor-not-allowed disabled:opacity-50 ${
+                    className={`btn inline-flex shrink-0 items-center justify-center px-2.5 disabled:cursor-not-allowed sm:px-3 disabled:opacity-50 ${
                       recording ? "btn-danger" : "btn-secondary"
                     }`}
                     aria-label={recording ? "Stop recording" : "Record voice note"}
@@ -862,7 +885,7 @@ export default function UserChat() {
                       type="button"
                       onClick={() => setEmojiOpen((open) => !open)}
                       disabled={sending || recording}
-                      className="btn btn-secondary inline-flex items-center justify-center px-3 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="btn btn-secondary inline-flex shrink-0 items-center justify-center px-2.5 disabled:cursor-not-allowed sm:px-3 disabled:opacity-50"
                       aria-label="Add emoji"
                       aria-expanded={emojiOpen}
                     >
@@ -876,14 +899,14 @@ export default function UserChat() {
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
                     placeholder={`Message ${activeDisplayName}`}
-                    className="input flex-1"
+                    className="input min-w-0 flex-1"
                     disabled={sending || recording}
                     maxLength={4000}
                   />
                   <button
                     type="submit"
                     disabled={!draft.trim() || sending || recording}
-                    className="btn btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="btn btn-primary inline-flex shrink-0 items-center gap-2 px-3 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
                   >
                     <PaperAirplaneIcon className="h-5 w-5" />
                     <span className="hidden sm:inline">{sending ? "Sending..." : "Send"}</span>

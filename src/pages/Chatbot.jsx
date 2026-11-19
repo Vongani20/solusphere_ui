@@ -9,7 +9,8 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
-import api, { getApiError } from "../services/api";
+import api, { getApiError } from "../services/api";
+import ResponsiveTable from "../components/ResponsiveTable";
 
 function cleanHeading(value) {
   return value.replace(/^#+\s*/, "").replace(/\*\*/g, "").trim();
@@ -82,6 +83,7 @@ function MarkdownTable({ rows }) {
   return (
     <div className="my-7 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
+        <ResponsiveTable>
         <table className="min-w-full divide-y divide-slate-200 text-sm sm:text-base">
           <thead className="bg-slate-50">
             <tr>
@@ -104,6 +106,7 @@ function MarkdownTable({ rows }) {
             ))}
           </tbody>
         </table>
+</ResponsiveTable>
       </div>
     </div>
   );
