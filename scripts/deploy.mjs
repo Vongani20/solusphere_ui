@@ -29,7 +29,9 @@ function loadEnv(filePath) {
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     stdio: "inherit",
-    shell: process.platform === "win32",
+    // Only npm needs a shell on Windows (npm.cmd). Running aws through the shell breaks
+    // paths with spaces such as "OneDrive - SoluGrowth", so aws.exe is run directly.
+    shell: process.platform === "win32" && command === "npm",
     env: options.env || process.env,
     cwd: options.cwd,
   });
