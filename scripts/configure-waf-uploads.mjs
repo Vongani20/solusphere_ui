@@ -19,6 +19,8 @@ const uploadPaths = [
   "/api/upload",
   // RFP Builder: POST /api/rfp/documents and /api/rfp/documents/:id/sources carry tender PDFs/Word files.
   "/api/rfp/documents",
+  // Profile photos are sent as base64 JSON.
+  "/api/profile/photo",
 ];
 
 function run(command, args) {
