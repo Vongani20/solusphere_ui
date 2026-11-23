@@ -8,6 +8,7 @@ import {
 import {
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
+  CheckCircleIcon,
   ClipboardDocumentListIcon,
   DocumentChartBarIcon,
   DocumentTextIcon,
@@ -29,6 +30,7 @@ import { LeafIcon } from "./BirthdayBoard";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: HomeIcon, tone: "teal" },
+  { name: "Tasks", href: "/tasks", icon: CheckCircleIcon, tone: "navy" },
   { name: "Birthdays", href: "/birthdays", icon: LeafIcon, tone: "forest" },
   { name: "Profile & Security", href: "/profile", icon: UserCircleIcon, tone: "navy" },
   { name: "Events", href: "/events", icon: CalendarDaysIcon, tone: "amber" },
@@ -48,6 +50,7 @@ export default function DashboardLayout({ children }) {
   const { callPhase, callSession } = useCall();
   const inbox = useChatInbox(30000);
   const inboxCount = inbox.unread_messages + inbox.missed_calls;
+  const [taskSummary, setTaskSummary] = useState({ open: 0, overdue: 0 });
   const location = useLocation();
   const navigate = useNavigate();
   const showCallBanner = callPhase !== "idle" && callPhase !== "ended";
@@ -56,6 +59,31 @@ export default function DashboardLayout({ children }) {
     () => navigation.filter((item) => !item.adminOnly || user?.role === "admin"),
     [user?.role]
   );
+
+  // Keep the sidebar avatar in sync when the profile photo changes.
+  useEffect(() => {
+    const refresh = () => setUser(getStoredUser());
+    window.addEventListener("ss-profile-updated", refresh);
+    return () => window.removeEventListener("ss-profile-updated", refresh);
+  }, []);
+
+  // Open-task badge for the Tasks menu item.
+  useEffect(() => {
+    let mounted = true;
+    const load = () =>
+      api
+        .get("/tasks/summary")
+        .then((res) => mounted && setTaskSummary(res.data || { open: 0, overdue: 0 }))
+        .catch(() => {});
+    load();
+    const timer = window.setInterval(load, 60000);
+    window.addEventListener("ss-tasks-changed", load);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+      window.removeEventListener("ss-tasks-changed", load);
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -125,6 +153,16 @@ export default function DashboardLayout({ children }) {
                 <span className="truncate">{item.name}</span>
                 {item.href === "/user-chat" && incomingCallerId ? (
                   <span className="ml-auto inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-500" />
+                ) : null}
+                {item.href === "/tasks" && taskSummary.open > 0 ? (
+                  <span
+                    className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white ${
+                      taskSummary.overdue > 0 ? "bg-rose-600" : "bg-slate-600"
+                    }`}
+                    title={taskSummary.overdue > 0 ? `${taskSummary.overdue} overdue` : `${taskSummary.open} open`}
+                  >
+                    {taskSummary.open > 99 ? "99+" : taskSummary.open}
+                  </span>
                 ) : null}
                 {item.href === "/user-chat" && !incomingCallerId && inboxCount > 0 ? (
                   <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-white">

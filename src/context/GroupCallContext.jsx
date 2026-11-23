@@ -73,7 +73,7 @@ function hasLiveVideo(stream) {
   return Boolean(stream?.getVideoTracks().some((track) => track.readyState === "live" && track.enabled && !track.muted));
 }
 
-function Tile({ name, stream, state, isSelf, muted, video }) {
+function Tile({ name, image, stream, state, isSelf, muted, video }) {
   const showVideo = video && hasLiveVideo(stream);
   const stateLabel =
     state === "connected"
@@ -89,7 +89,7 @@ function Tile({ name, stream, state, isSelf, muted, video }) {
     <div className="relative flex aspect-video min-h-28 items-center justify-center overflow-hidden rounded-xl bg-slate-800">
       {showVideo ? <VideoView stream={stream} mirrored={isSelf} /> : null}
       {!showVideo ? (
-        <UserAvatar user={{ username: name }} className="h-14 w-14 text-lg ring-2 ring-white/20" iconClassName="h-7 w-7" />
+        <UserAvatar user={{ username: name, image_url: image }} className="h-14 w-14 text-lg ring-2 ring-white/20" iconClassName="h-7 w-7" />
       ) : null}
       <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 py-2 text-xs text-white">
         <span className="truncate font-semibold">{isSelf ? `${name} (you)` : name}</span>
@@ -594,6 +594,7 @@ export function GroupCallProvider({ children }) {
             <div className="grid flex-1 grid-cols-1 gap-3 overflow-y-auto p-4 sm:grid-cols-2 lg:grid-cols-3">
               <Tile
                 name={currentUser?.username || "You"}
+                image={currentUser?.image_url}
                 stream={localStream}
                 state="connected"
                 isSelf
@@ -604,6 +605,7 @@ export function GroupCallProvider({ children }) {
                 <Tile
                   key={participant.user_id}
                   name={participant.username}
+                  image={participant.image_url}
                   stream={remoteStreams[participant.user_id]}
                   state={participant.status === "invited" ? "ringing" : peerStates[participant.user_id]}
                   video={isVideo}

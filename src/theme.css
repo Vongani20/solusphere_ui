@@ -437,3 +437,69 @@ html.dark .mobile-menu-button {
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   }
 }
+
+/* Tailwind's `primary` colour is a fixed hex; use the brighter dark-mode teal for text. */
+html.dark .text-primary,
+html.dark .hover\:text-primary:hover {
+  color: var(--ss-primary);
+}
+
+/* Paperless (green) accents on the Tender Proposal page */
+html.dark .bg-\[\#f6faf7\],
+html.dark .bg-\[\#f3f8f4\] {
+  background-color: rgba(79, 157, 110, 0.08);
+}
+html.dark .border-emerald-100 {
+  border-color: rgba(16, 185, 129, 0.2);
+}
+html.dark .ring-emerald-100,
+html.dark .ring-emerald-200 {
+  --tw-ring-color: rgba(16, 185, 129, 0.3);
+}
+html.dark .bg-white\/70 {
+  background-color: rgba(22, 30, 38, 0.7);
+}
+html.dark .text-emerald-600 {
+  color: #34d399;
+}
+html.dark .hover\:border-emerald-300:hover,
+html.dark .border-emerald-300 {
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+/* Chat "is typing" dots */
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 10px;
+}
+.typing-dots > span {
+  height: 7px;
+  width: 7px;
+  border-radius: 9999px;
+  background: #94a3b8;
+  animation: typing-bounce 1.2s infinite ease-in-out;
+}
+.typing-dots > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-dots > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .typing-dots > span {
+    animation: none;
+    opacity: 0.8;
+  }
+}

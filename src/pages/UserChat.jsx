@@ -100,10 +100,28 @@ function ReadReceipt({ message, onLightBackground }) {
   );
 }
 
+function TypingBubble({ user }) {
+  return (
+    <div className="flex items-end gap-2 sm:gap-3" aria-live="polite">
+      <span className="hidden shrink-0 sm:block">
+        <UserAvatar user={user} className="h-9 w-9" iconClassName="h-5 w-5" />
+      </span>
+      <div className="rounded-2xl bg-slate-100 px-4 py-3" title={`${user?.username || "They"} is typing`}>
+        <span className="sr-only">{user?.username || "They"} is typing</span>
+        <span className="typing-dots" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function ChatMessageBubble({ message, ownMessage, currentUser, onReact }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const reactButtonRef = useRef(null);
-  const sender = { username: message.sender_username };
+  const sender = { username: message.sender_username, image_url: message.sender_image_url };
   const attachmentUrl = resolveImageUrl(message.attachment_url);
   const emojiOnly = (message.message_type || "text") === "text" && isEmojiOnly(message.message);
   const reactionGroups = groupReactions(message.reactions, currentUser?.id);
@@ -229,6 +247,8 @@ export default function UserChat() {
   const [activeUser, setActiveUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
+  const [peerTyping, setPeerTyping] = useState(false);
+  const typingSentAtRef = useRef(0);
   const [loadingSidebar, setLoadingSidebar] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
@@ -382,9 +402,46 @@ export default function UserChat() {
     return () => window.clearInterval(timer);
   }, [activeUserID, loadMessages, loadSidebar]);
 
+  // Typing indicator: tell the other person while I type (at most every 3s)...
+  useEffect(() => {
+    if (!activeUserID) return;
+    const hasText = draft.trim().length > 0;
+    const now = Date.now();
+    if (hasText && now - typingSentAtRef.current > 3000) {
+      typingSentAtRef.current = now;
+      api.post(`/chats/${activeUserID}/typing`, { typing: true }).catch(() => {});
+    } else if (!hasText && typingSentAtRef.current) {
+      typingSentAtRef.current = 0;
+      api.post(`/chats/${activeUserID}/typing`, { typing: false }).catch(() => {});
+    }
+  }, [draft, activeUserID]);
+
+  // ...and check every 2s whether they are typing to me.
+  useEffect(() => {
+    setPeerTyping(false);
+    typingSentAtRef.current = 0;
+    if (!activeUserID) return undefined;
+    let stopped = false;
+    const check = async () => {
+      if (document.hidden) return;
+      try {
+        const res = await api.get(`/chats/${activeUserID}/typing`, { params: { _ts: Date.now() } });
+        if (!stopped) setPeerTyping(Boolean(res.data?.typing));
+      } catch {
+        // ignore transient errors
+      }
+    };
+    check();
+    const timer = window.setInterval(check, 2000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [activeUserID]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [orderedMessages.length, activeUserID]);
+  }, [orderedMessages.length, activeUserID, peerTyping]);
 
   useEffect(() => {
     return () => {
@@ -427,6 +484,7 @@ export default function UserChat() {
     try {
       const res = await api.post(`/chats/${activeUserID}/messages`, { message: body });
       appendMessage(res.data.message);
+      typingSentAtRef.current = 0; // the server clears my typing state when the message is saved
       setDraft("");
     } catch (err) {
       setChatError(getApiError(err, "Failed to send message."));
@@ -753,9 +811,13 @@ export default function UserChat() {
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-bold text-slate-950 sm:text-xl">{activeDisplayName}</h2>
                     <p className="truncate text-xs text-slate-500 sm:text-sm">
-                      <span className={activeUser?.is_online ? "font-semibold text-emerald-600" : ""}>
-                        {formatPresenceLabel(activeUser)}
-                      </span>
+                      {peerTyping ? (
+                        <span className="font-semibold text-emerald-600">typing…</span>
+                      ) : (
+                        <span className={activeUser?.is_online ? "font-semibold text-emerald-600" : ""}>
+                          {formatPresenceLabel(activeUser)}
+                        </span>
+                      )}
                       {activeRole ? ` · ${activeRole}` : ""}
                     </p>
                   </div>
@@ -848,6 +910,7 @@ export default function UserChat() {
                     />
                   ))
                 )}
+                {peerTyping ? <TypingBubble user={activeUser} /> : null}
                 <div ref={messagesEndRef} />
               </div>
 

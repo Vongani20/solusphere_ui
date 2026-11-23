@@ -15,6 +15,7 @@ import api, { getApiError } from "../services/api";
 import { useDocumentProcessingConsent } from "../hooks/useDocumentProcessingConsent";
 import { formatDate } from "../utils/formatters";
 import { blobToBase64 } from "../utils/faceCapture";
+import ProposalHome from "../components/ProposalHome";
 
 const ACCEPT =
   ".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
@@ -295,115 +296,19 @@ export default function RFPBuilder() {
             onAddDocuments={onAddDocuments}
           />
         ) : (
-          <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-            <div className="card">
-              <div className="mb-5 flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-white">
-                  <ClipboardDocumentListIcon className="h-6 w-6" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-slate-950">Tender Proposal</h1>
-                  <p className="text-sm text-slate-500">
-                    Upload a tender and get a proposal that answers each proposal requirement.
-                  </p>
-                </div>
-              </div>
-
-              {!aiConfigured && (
-                <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  AI is not configured on the server, so templates use the built-in reader.
-                </p>
-              )}
-
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  withConsent(createTemplate);
-                }}
-                className="space-y-4"
-              >
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-slate-700">
-                    Tender documents (PDF, Word or text, up to 12 files, 15 MB each)
-                  </span>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept={ACCEPT}
-                    onChange={(event) => setFiles([...(event.target.files || [])])}
-                    className="block w-full rounded-lg border border-slate-300 bg-white text-sm text-slate-700 file:mr-4 file:border-0 file:bg-slate-900 file:px-4 file:py-3 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
-                  />
-                </label>
-
-                {files.length > 0 && (
-                  <ul className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                    {files.map((file) => (
-                      <li key={file.name} className="truncate">
-                        {file.name}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={!files.length || uploading}
-                  className="btn btn-primary inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                >
-                  <DocumentArrowUpIcon className="h-5 w-5" />
-                  {uploading ? "Uploading…" : "Build proposal"}
-                </button>
-              </form>
-            </div>
-
-            <div className="card">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-950">Your templates</h2>
-                  <p className="text-sm text-slate-500">{documents.length} saved</p>
-                </div>
-                <button type="button" onClick={loadDocuments} className="btn btn-secondary inline-flex items-center gap-2">
-                  <ArrowPathIcon className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
-                  Refresh
-                </button>
-              </div>
-
-              {documents.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                  {loading ? "Loading templates…" : "No templates yet. Upload a tender to start."}
-                </p>
-              ) : (
-                <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200">
-                  {documents.map((doc) => (
-                    <li key={doc.id} className="flex items-center gap-3 bg-white px-4 py-3 hover:bg-slate-50">
-                      <button type="button" onClick={() => openDocument(doc.id)} className="min-w-0 flex-1 text-left">
-                        <p className="truncate text-sm font-semibold text-slate-950">{doc.title}</p>
-                        <p className="truncate text-xs text-slate-500">
-                          {[doc.issuer, doc.referenceNumber, doc.closingDate && `Closes ${doc.closingDate}`]
-                            .filter(Boolean)
-                            .join(" · ") || doc.originalFilename}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-400">
-                          {formatDate(doc.updatedAt)} · {doc.sourceCount} file{doc.sourceCount === 1 ? "" : "s"}
-                          {doc.gapCount ? ` · ${doc.gapCount} to confirm` : ""}
-                        </p>
-                      </button>
-                      <StatusBadge status={doc.status} />
-                      <button
-                        type="button"
-                        onClick={() => deleteDocument(doc.id)}
-                        className="rounded-lg p-2 text-slate-600 hover:bg-rose-50 hover:text-rose-700"
-                        aria-label={`Delete ${doc.title}`}
-                      >
-                        <TrashIcon className="h-5 w-5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </section>
+          <ProposalHome
+            aiConfigured={aiConfigured}
+            files={files}
+            setFiles={setFiles}
+            uploading={uploading}
+            onBuild={() => withConsent(createTemplate)}
+            documents={documents}
+            loading={loading}
+            onRefresh={loadDocuments}
+            onOpen={openDocument}
+            onDelete={deleteDocument}
+            fileInputRef={fileInputRef}
+          />
         )}
       </div>
 

@@ -20,6 +20,7 @@ import api, { getApiError, saveSession } from "../services/api";
 import { getCameraErrorMessage, requestUserCamera } from "../utils/camera";
 import { blobToBase64, canvasToJpegBlob, captureFollowedFace } from "../utils/faceCapture";
 import { formatDate, titleize } from "../utils/formatters";
+import { squareImageDataUrl } from "../utils/imageResize";
 
 export default function Profile() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,6 +35,8 @@ export default function Profile() {
   const [error, setError] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [savingBirthDate, setSavingBirthDate] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const photoInputRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const trackingEnabled = cameraOpen && !capturedImage;
@@ -161,6 +164,50 @@ export default function Profile() {
     }
   };
 
+  const applyPhoto = (imageUrl, hasPhoto) => {
+    setUser((current) => {
+      const next = { ...current, image_url: imageUrl, has_profile_photo: hasPhoto };
+      saveSession({ user: next });
+      return next;
+    });
+    window.dispatchEvent(new Event("ss-profile-updated"));
+  };
+
+  const uploadPhoto = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setPhotoBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const image = await squareImageDataUrl(file);
+      const res = await api.post("/profile/photo", { image });
+      applyPhoto(res.data.image_url, true);
+      setMessage("Profile photo updated. Colleagues now see it in chats and calls.");
+    } catch (err) {
+      setError(err?.response ? getApiError(err, "Photo could not be uploaded.") : err.message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const removePhoto = async () => {
+    setPhotoBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await api.delete("/profile/photo");
+      setMessage("Profile photo removed.");
+      await fetchProfile();
+      window.dispatchEvent(new Event("ss-profile-updated"));
+    } catch (err) {
+      setError(getApiError(err, "Photo could not be removed."));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
   const deleteFace = async () => {
     setDeleting(true);
     setError("");
@@ -195,13 +242,54 @@ export default function Profile() {
         <section className="card">
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div className="flex min-w-0 items-center gap-5">
-              <UserAvatar user={user} className="h-24 w-24" iconClassName="h-16 w-16" />
+              <div className="relative shrink-0">
+                <UserAvatar user={user} className="h-24 w-24 !rounded-2xl" iconClassName="h-16 w-16" />
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={uploadPhoto}
+                />
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={photoBusy}
+                  className="absolute -bottom-2 -right-2 inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-primary text-white shadow-md transition hover:bg-primary-dark disabled:opacity-60"
+                  aria-label={user?.has_profile_photo ? "Change profile photo" : "Add profile photo"}
+                  title={user?.has_profile_photo ? "Change photo" : "Add a photo"}
+                >
+                  {photoBusy ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <CameraIcon className="h-4 w-4" />}
+                </button>
+              </div>
               <div className="min-w-0">
                 <h1 className="truncate text-2xl font-bold text-slate-950">{user?.username || "Profile"}</h1>
                 <p className="truncate text-slate-500">{user?.email || "Email unavailable"}</p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <StatusPill active={user?.face_status} />
                   <span className="status-pill-neutral">{titleize(user?.role)}</span>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={photoBusy}
+                    className="font-semibold text-primary hover:underline disabled:opacity-60"
+                  >
+                    {user?.has_profile_photo ? "Change photo" : "Add a profile photo"}
+                  </button>
+                  {user?.has_profile_photo ? (
+                    <button
+                      type="button"
+                      onClick={removePhoto}
+                      disabled={photoBusy}
+                      className="font-semibold text-rose-700 hover:underline disabled:opacity-60"
+                    >
+                      Remove photo
+                    </button>
+                  ) : (
+                    <span className="text-slate-500">Shown to colleagues in chats and calls</span>
+                  )}
                 </div>
               </div>
             </div>

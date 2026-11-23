@@ -16,6 +16,7 @@ import Chatbot from "./pages/Chatbot";
 import UpdatePassword from "./pages/UpdatePassword";
 import CVBuilder from "./pages/CVBuilder";
 import RFPBuilder from "./pages/RFPBuilder";
+import Tasks from "./pages/Tasks";
 import Innovation from "./pages/Innovation";
 import Birthdays from "./pages/Birthdays";
 import AdminRoute from "./components/AdminRoute";
@@ -138,6 +139,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Innovation />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tasks"
+          element={
+            <ProtectedRoute>
+              <Tasks />
             </ProtectedRoute>
           }
         />
