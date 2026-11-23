@@ -3,39 +3,43 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeftOnRectangleIcon,
   Bars3Icon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import {
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
   ClipboardDocumentListIcon,
-  CloudArrowUpIcon,
   DocumentChartBarIcon,
   DocumentTextIcon,
   HomeIcon,
+  LightBulbIcon,
   ShieldCheckIcon,
   TicketIcon,
   UserGroupIcon,
   UserCircleIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/outline";
+} from "@heroicons/react/24/solid";
 import api, { clearSession, getStoredUser } from "../services/api";
 import { externalTools } from "../data/externalTools";
 import { useCall } from "../context/CallContext";
 import { useChatInbox } from "../hooks/useChatInbox";
+import DimensionalIcon from "./DimensionalIcon";
+import ThemeSwitcher from "./ThemeSwitcher";
 import UserAvatar from "./UserAvatar";
 import { LeafIcon } from "./BirthdayBoard";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
-  { name: "Birthdays", href: "/birthdays", icon: LeafIcon },
-  { name: "Profile & Security", href: "/profile", icon: UserCircleIcon },
-  { name: "Events", href: "/events", icon: CalendarDaysIcon },
-  { name: "User Chat", href: "/user-chat", icon: UserGroupIcon },
-  { name: "Help Desk", href: "/helpdesk", icon: TicketIcon },
-  { name: "SIA Chat", href: "/chatbot", icon: ChatBubbleLeftRightIcon },
-  { name: "BPO Analysis", href: "/bpo", icon: DocumentChartBarIcon },
-  { name: "CV Builder", href: "/cv-builder", icon: DocumentTextIcon },
-  { name: "Tender Proposal", href: "/rfp-builder", icon: ClipboardDocumentListIcon },
-  // { name: "Uploads", href: "/uploads", icon: CloudArrowUpIcon },
-  { name: "Admin", href: "/admin", icon: ShieldCheckIcon, adminOnly: true },
+  { name: "Dashboard", href: "/dashboard", icon: HomeIcon, tone: "teal" },
+  { name: "Birthdays", href: "/birthdays", icon: LeafIcon, tone: "forest" },
+  { name: "Profile & Security", href: "/profile", icon: UserCircleIcon, tone: "navy" },
+  { name: "Events", href: "/events", icon: CalendarDaysIcon, tone: "amber" },
+  { name: "User Chat", href: "/user-chat", icon: UserGroupIcon, tone: "forest" },
+  { name: "Help Desk", href: "/helpdesk", icon: TicketIcon, tone: "rose" },
+  { name: "SIA Chat", href: "/chatbot", icon: ChatBubbleLeftRightIcon, tone: "teal" },
+  { name: "BPO Analysis", href: "/bpo", icon: DocumentChartBarIcon, tone: "navy" },
+  { name: "CV Builder", href: "/cv-builder", icon: DocumentTextIcon, tone: "teal" },
+  { name: "Tender Proposal", href: "/rfp-builder", icon: ClipboardDocumentListIcon, tone: "forest" },
+  { name: "SoluGility", href: "/innovation", icon: LightBulbIcon, tone: "amber" },
+  { name: "Admin", href: "/admin", icon: ShieldCheckIcon, tone: "rose", adminOnly: true },
 ];
 
 export default function DashboardLayout({ children }) {
@@ -70,18 +74,6 @@ export default function DashboardLayout({ children }) {
     };
   }, []);
 
-  const currentPage = useMemo(() => {
-    return (
-      visibleNavigation.find((item) => {
-            if (item.href === "/dashboard") return location.pathname === item.href;
-        if (item.href === "/profile") {
-          return location.pathname === "/profile" || location.pathname === "/update-password";
-        }
-        return location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
-      })?.name || "SoluSphere"
-    );
-  }, [location.pathname, visibleNavigation]);
-
   const handleLogout = () => {
     clearSession();
     navigate("/login");
@@ -103,27 +95,19 @@ export default function DashboardLayout({ children }) {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-14 items-center justify-between border-b border-[#e1e6ea] px-4">
-          <Link to="/dashboard" className="flex items-center gap-2.5" onClick={() => setSidebarOpen(false)}>
-            <img src="/icon.png" alt="" className="h-6 w-6 rounded-md object-contain" />
-            <div>
-              <p className="text-xs font-bold leading-tight text-heading">SoluSphere</p>
-              <p className="text-[8px] font-medium text-muted">Operations UI</p>
-            </div>
-          </Link>
+        <div className="flex justify-end px-3 pt-3 lg:hidden">
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="rounded-md p-1.5 text-muted hover:bg-white hover:text-heading lg:hidden"
+            className="rounded-md p-1.5 text-muted hover:bg-white hover:text-heading"
             aria-label="Close navigation"
           >
             <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3 lg:pt-5">
           {visibleNavigation.map((item) => {
-            const Icon = item.icon;
             const isActive =
               location.pathname === item.href ||
               (item.href !== "/dashboard" && location.pathname.startsWith(`${item.href}/`));
@@ -137,7 +121,7 @@ export default function DashboardLayout({ children }) {
                 }`}
                 onClick={() => setSidebarOpen(false)}
               >
-                <Icon className="h-[13px] w-[13px] shrink-0" />
+                <DimensionalIcon icon={item.icon} tone={item.tone} size="sm" soft />
                 <span className="truncate">{item.name}</span>
                 {item.href === "/user-chat" && incomingCallerId ? (
                   <span className="ml-auto inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-500" />
@@ -151,8 +135,8 @@ export default function DashboardLayout({ children }) {
             );
           })}
           <p className="px-2 pb-1 pt-4 text-[8px] font-bold uppercase tracking-wide text-muted">External</p>
-          {externalTools.map((item) => {
-            const Icon = item.icon;
+          {externalTools.map((item, index) => {
+            const tone = ["teal", "forest", "amber"][index % 3];
             return (
               <a
                 key={item.href}
@@ -162,7 +146,7 @@ export default function DashboardLayout({ children }) {
                 className="sidebar-link"
                 onClick={() => setSidebarOpen(false)}
               >
-                <Icon className="h-[13px] w-[13px] shrink-0" />
+                <DimensionalIcon icon={item.icon} tone={tone} size="sm" soft />
                 <span className="truncate">{item.name}</span>
               </a>
             );
@@ -170,6 +154,7 @@ export default function DashboardLayout({ children }) {
         </nav>
 
         <div className="border-t border-[#e1e6ea] p-3">
+          <ThemeSwitcher className="mb-2.5" />
           <div className="mb-2.5 flex items-center gap-2 rounded-md bg-white/60 p-2">
             <UserAvatar user={user} className="h-[26px] w-[26px]" iconClassName="h-4 w-4" />
             <div className="min-w-0">
@@ -188,31 +173,23 @@ export default function DashboardLayout({ children }) {
       </aside>
 
       <div className={`lg:pl-72 ${showCallBanner ? "pt-14" : ""}`}>
-        <header className="sticky top-0 z-30 flex h-[52px] items-center border-b border-[#e7ebee] bg-white/95 px-4 backdrop-blur sm:px-5" style={showCallBanner ? { top: "3.5rem" } : undefined}>
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="mr-2.5 rounded-md p-1.5 text-nav-idle hover:bg-sidebar hover:text-heading lg:hidden"
-            aria-label="Open navigation"
-          >
-            <Bars3Icon className="h-5 w-5" />
-          </button>
+        {/* No top bar: on phones and tablets a floating button opens the menu. */}
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          className="mobile-menu-button fixed left-3 z-30 lg:hidden"
+          style={{ top: showCallBanner ? "4.25rem" : "0.75rem" }}
+          aria-label="Open navigation"
+        >
+          <Bars3Icon className="h-5 w-5" />
+          {inboxCount > 0 ? (
+            <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white">
+              {inboxCount > 99 ? "99+" : inboxCount}
+            </span>
+          ) : null}
+        </button>
 
-          <div className="flex min-w-0 flex-1 items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-heading">{currentPage}</p>
-              <p className="hidden text-[9px] font-medium text-muted sm:block">SoluSphere workspace</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`face-badge hidden sm:inline-flex ${!user?.face_status ? "!border-[#b07d20]/30 !bg-[#fff4e0] !text-[#b07d20]" : ""}`}>
-                {user?.face_status ? "Face verified" : "Face setup pending"}
-              </span>
-              <UserAvatar user={user} className="h-7 w-7" iconClassName="h-4 w-4" />
-            </div>
-          </div>
-        </header>
-
-        <main className="p-4 sm:p-5">{children}</main>
+        <main className="p-4 pt-16 sm:p-5 sm:pt-16 lg:pt-5">{children}</main>
       </div>
     </div>
   );

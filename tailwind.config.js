@@ -1,7 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: "class",
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   safelist: [
+    // Built as `dash-metric-${tone}` / `icon-orb-${tone}` / `icon-soft-${tone}`, so Tailwind
+    // cannot see them in the source; without this they are dropped from the build.
+    { pattern: /^(dash-metric|icon-orb|icon-soft)-(teal|amber|forest|navy|rose)$/ },
     "bg-surface",
     "bg-sidebar",
     "bg-heading",
