@@ -9,6 +9,7 @@ export default function Register() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [password, setPassword] = useState("");
   const [loadingProvider, setLoadingProvider] = useState("");
   const [error, setError] = useState("");
@@ -26,6 +27,7 @@ export default function Register() {
         username,
         email,
         phone_number: phoneNumber,
+        birth_date: birthDate,
         password,
       });
       setSuccess(res.data?.message || "Account created. Redirecting to sign in.");
@@ -68,6 +70,7 @@ export default function Register() {
           placeholder="+27 82 000 0000"
           required={false}
         />
+        <AuthField label="Birth date" type="date" value={birthDate} onChange={setBirthDate} />
         <AuthField
           label="Password"
           type="password"
@@ -90,7 +93,7 @@ export default function Register() {
 
       <Microsoft365Button
         onClick={() => registerAccount("outlook365")}
-        disabled={isLoading || Boolean(success) || !username || !email || password.length < 6}
+        disabled={isLoading || Boolean(success) || !username || !email || !birthDate || password.length < 6}
         className="mb-3"
       >
         {loadingProvider === "outlook365" ? "Creating Outlook 365..." : "Create Outlook 365 Account"}

@@ -17,6 +17,7 @@ import UpdatePassword from "./pages/UpdatePassword";
 import CVBuilder from "./pages/CVBuilder";
 import RFPBuilder from "./pages/RFPBuilder";
 import Innovation from "./pages/Innovation";
+import Birthdays from "./pages/Birthdays";
 import AdminRoute from "./components/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -49,6 +50,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/birthdays"
+          element={
+            <ProtectedRoute>
+              <Birthdays />
             </ProtectedRoute>
           }
         />

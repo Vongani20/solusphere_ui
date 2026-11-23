@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRightIcon,
+  ArrowTopRightOnSquareIcon,
   CalendarDaysIcon,
   CheckCircleIcon,
   CloudArrowUpIcon,
@@ -11,7 +12,9 @@ import {
   UserCircleIcon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
+import BirthdayBoard from "../components/BirthdayBoard";
 import DashboardLayout from "../components/DashboardLayout";
+import { externalTools } from "../data/externalTools";
 import api, { getApiError, getStoredUser } from "../services/api";
 import { formatDate, statusTone, titleize } from "../utils/formatters";
 
@@ -19,16 +22,19 @@ export default function Dashboard() {
   const [profile, setProfile] = useState(() => getStoredUser());
   const [analyses, setAnalyses] = useState([]);
   const [events, setEvents] = useState([]);
+  const [birthdays, setBirthdays] = useState([]);
+  const [birthdaysToday, setBirthdaysToday] = useState([]);
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let mounted = true;
 
     async function loadDashboard() {
-      const [profileResult, analysesResult, eventsResult] = await Promise.allSettled([
+      const [profileResult, analysesResult, eventsResult, birthdaysResult] = await Promise.allSettled([
         api.get("/profile"),
         api.get("/bpo/analyses", { params: { limit: 5 } }),
         api.get("/events"),
+        api.get("/birthdays"),
       ]);
 
       if (!mounted) return;
@@ -41,6 +47,10 @@ export default function Dashboard() {
       }
       if (eventsResult.status === "fulfilled") {
         setEvents(eventsResult.value.data.events || []);
+      }
+      if (birthdaysResult.status === "fulfilled") {
+        setBirthdays(birthdaysResult.value.data.birthdays || []);
+        setBirthdaysToday(birthdaysResult.value.data.today || []);
       }
 
       const blocked = [analysesResult, eventsResult].find(
@@ -65,6 +75,13 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="mx-auto max-w-7xl space-y-6">
+        <BirthdayBoard
+          people={birthdays}
+          today={birthdaysToday}
+          missingBirthDate={Boolean(profile) && !profile.birth_date}
+          compact
+        />
+
         {notice && (
           <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
             <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" />
@@ -124,6 +141,9 @@ export default function Dashboard() {
               <ActionLink to="/user-chat" icon={UserGroupIcon} label="User Chat" />
               <ActionLink to="/events" icon={CalendarDaysIcon} label="Event Chat" />
               <ActionLink to="/chatbot" icon={SparklesIcon} label="SIA Chat" />
+              {externalTools.map((tool) => (
+                <ExternalActionLink key={tool.href} href={tool.href} icon={tool.icon} label={tool.name} />
+              ))}
             </div>
           </div>
         </section>
@@ -219,6 +239,23 @@ function ActionLink({ to, icon: Icon, label }) {
       </span>
       <span className="font-bold text-primary">→</span>
     </Link>
+  );
+}
+
+function ExternalActionLink({ href, icon: Icon, label }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center justify-between gap-3 rounded-md border border-border-ui px-3 py-2 text-[10px] font-semibold text-nav-idle hover:border-primary/30 hover:bg-primary/5"
+    >
+      <span className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </span>
+      <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 text-primary" />
+    </a>
   );
 }
 

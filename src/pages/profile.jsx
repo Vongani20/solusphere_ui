@@ -32,6 +32,8 @@ export default function Profile() {
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [savingBirthDate, setSavingBirthDate] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const trackingEnabled = cameraOpen && !capturedImage;
@@ -44,6 +46,7 @@ export default function Profile() {
     try {
       const res = await api.get("/profile");
       setUser(res.data.user);
+      setBirthDate(res.data.user?.birth_date || "");
       saveSession({ user: res.data.user });
       if (!res.data.user?.face_status) {
         setCameraOpen(true);
@@ -134,6 +137,27 @@ export default function Profile() {
       setError(getApiError(err, "Face profile could not be saved."));
     } finally {
       setUploading(false);
+    }
+  };
+
+  const saveBirthDate = async (event) => {
+    event.preventDefault();
+    if (!birthDate) {
+      setError("Birth date is required.");
+      return;
+    }
+    setSavingBirthDate(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await api.patch("/profile/birth-date", { birth_date: birthDate });
+      setUser(res.data.user);
+      saveSession({ user: res.data.user });
+      setMessage("Birth date saved. It is now on everyone's birthday board.");
+    } catch (err) {
+      setError(getApiError(err, "Birth date could not be saved."));
+    } finally {
+      setSavingBirthDate(false);
     }
   };
 
@@ -231,6 +255,28 @@ export default function Profile() {
           <SecurityPanel />
         ) : (
         <section className="grid gap-6 xl:grid-cols-[1fr_0.75fr]">
+          <form onSubmit={saveBirthDate} className="card border-[#c5ddc8] bg-[#f3f8f4] xl:col-span-2">
+            <h2 className="text-lg font-bold text-[#1c4a32]">Birth date</h2>
+            <p className="mt-1 text-sm text-[#3d6b4f]">
+              Required for every account. On your birthday the team sees your photo and a paperless wish.
+            </p>
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#3d6b4f]">Date</span>
+                <input
+                  type="date"
+                  required
+                  value={birthDate}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(event) => setBirthDate(event.target.value)}
+                  className="input bg-white"
+                />
+              </label>
+              <button type="submit" disabled={savingBirthDate} className="btn btn-primary disabled:opacity-50">
+                {savingBirthDate ? "Saving..." : user?.birth_date ? "Update birth date" : "Save birth date"}
+              </button>
+            </div>
+          </form>
           <div className="card">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>

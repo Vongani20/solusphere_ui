@@ -1,37 +1,41 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeftOnRectangleIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
+  ArrowLeftOnRectangleIcon,
+  Bars3Icon,
   CalendarDaysIcon,
   ChatBubbleLeftRightIcon,
-  ClipboardDocumentCheckIcon,
-  IdentificationIcon,
-  LifebuoyIcon,
-  LightBulbIcon,
-  PresentationChartLineIcon,
+  ClipboardDocumentListIcon,
+  CloudArrowUpIcon,
+  DocumentChartBarIcon,
+  DocumentTextIcon,
+  HomeIcon,
   ShieldCheckIcon,
-  SparklesIcon,
-  Squares2X2Icon,
+  TicketIcon,
+  UserGroupIcon,
   UserCircleIcon,
-} from "@heroicons/react/24/solid";
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import api, { clearSession, getStoredUser } from "../services/api";
+import { externalTools } from "../data/externalTools";
 import { useCall } from "../context/CallContext";
 import { useChatInbox } from "../hooks/useChatInbox";
 import UserAvatar from "./UserAvatar";
+import { LeafIcon } from "./BirthdayBoard";
 
-// Each module gets its own icon and colour so the menu is easy to scan.
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: Squares2X2Icon, tone: "bg-sky-100 text-sky-600" },
-  { name: "Profile & Security", href: "/profile", icon: UserCircleIcon, tone: "bg-slate-200 text-slate-600" },
-  { name: "Events", href: "/events", icon: CalendarDaysIcon, tone: "bg-orange-100 text-orange-600" },
-  { name: "User Chat", href: "/user-chat", icon: ChatBubbleLeftRightIcon, tone: "bg-emerald-100 text-emerald-600" },
-  { name: "Help Desk", href: "/helpdesk", icon: LifebuoyIcon, tone: "bg-rose-100 text-rose-600" },
-  { name: "SIA Chat", href: "/chatbot", icon: SparklesIcon, tone: "bg-violet-100 text-violet-600" },
-  { name: "BPO Analysis", href: "/bpo", icon: PresentationChartLineIcon, tone: "bg-indigo-100 text-indigo-600" },
-  { name: "CV Builder", href: "/cv-builder", icon: IdentificationIcon, tone: "bg-cyan-100 text-cyan-700" },
-  { name: "RFP Builder", href: "/rfp-builder", icon: ClipboardDocumentCheckIcon, tone: "bg-teal-100 text-teal-700" },
-  { name: "SoluGility", href: "/innovation", icon: LightBulbIcon, tone: "bg-amber-100 text-amber-600" },
-  { name: "Admin", href: "/admin", icon: ShieldCheckIcon, tone: "bg-red-100 text-red-600", adminOnly: true },
+  { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
+  { name: "Birthdays", href: "/birthdays", icon: LeafIcon },
+  { name: "Profile & Security", href: "/profile", icon: UserCircleIcon },
+  { name: "Events", href: "/events", icon: CalendarDaysIcon },
+  { name: "User Chat", href: "/user-chat", icon: UserGroupIcon },
+  { name: "Help Desk", href: "/helpdesk", icon: TicketIcon },
+  { name: "SIA Chat", href: "/chatbot", icon: ChatBubbleLeftRightIcon },
+  { name: "BPO Analysis", href: "/bpo", icon: DocumentChartBarIcon },
+  { name: "CV Builder", href: "/cv-builder", icon: DocumentTextIcon },
+  { name: "Tender Proposal", href: "/rfp-builder", icon: ClipboardDocumentListIcon },
+  // { name: "Uploads", href: "/uploads", icon: CloudArrowUpIcon },
+  { name: "Admin", href: "/admin", icon: ShieldCheckIcon, adminOnly: true },
 ];
 
 export default function DashboardLayout({ children }) {
@@ -133,13 +137,7 @@ export default function DashboardLayout({ children }) {
                 }`}
                 onClick={() => setSidebarOpen(false)}
               >
-                <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition ${
-                    isActive ? "bg-primary text-white shadow-sm" : item.tone
-                  }`}
-                >
-                  <Icon className="h-4 w-4" aria-hidden="true" />
-                </span>
+                <Icon className="h-[13px] w-[13px] shrink-0" />
                 <span className="truncate">{item.name}</span>
                 {item.href === "/user-chat" && incomingCallerId ? (
                   <span className="ml-auto inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-500" />
@@ -150,6 +148,23 @@ export default function DashboardLayout({ children }) {
                   </span>
                 ) : null}
               </Link>
+            );
+          })}
+          <p className="px-2 pb-1 pt-4 text-[8px] font-bold uppercase tracking-wide text-muted">External</p>
+          {externalTools.map((item) => {
+            const Icon = item.icon;
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                className="sidebar-link"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <Icon className="h-[13px] w-[13px] shrink-0" />
+                <span className="truncate">{item.name}</span>
+              </a>
             );
           })}
         </nav>

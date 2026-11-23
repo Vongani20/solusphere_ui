@@ -28,6 +28,7 @@ const emptyUserForm = {
   username: "",
   email: "",
   phone_number: "",
+  birth_date: "",
   password: "",
   role: "user",
 };
@@ -382,6 +383,7 @@ export default function Admin() {
       username: user.username || "",
       email: user.email || "",
       phone_number: user.phone_number || "",
+      birth_date: user.birth_date || "",
       password: "",
       role: user.role || "user",
     });
@@ -397,6 +399,7 @@ export default function Admin() {
       username: userForm.username.trim(),
       email: userForm.email.trim(),
       phone_number: userForm.phone_number.trim(),
+      birth_date: userForm.birth_date,
       role: userForm.role,
     };
     if (!editingUserID || userForm.password.trim()) {
@@ -742,6 +745,7 @@ export default function Admin() {
                 <AdminInput label="Username" value={userForm.username} onChange={(value) => setUserFormField(setUserForm, "username", value)} icon={UserIcon} required />
                 <AdminInput label="Email" type="email" value={userForm.email} onChange={(value) => setUserFormField(setUserForm, "email", value)} icon={EnvelopeIcon} required />
                 <AdminInput label="Phone" type="tel" value={userForm.phone_number} onChange={(value) => setUserFormField(setUserForm, "phone_number", value)} icon={PhoneIcon} />
+                <AdminInput label="Birth date" type="date" value={userForm.birth_date} onChange={(value) => setUserFormField(setUserForm, "birth_date", value)} icon={CalendarDaysIcon} required />
                 <AdminInput
                   label={editingUserID ? "New Password" : "Temporary Password"}
                   type="password"
@@ -765,6 +769,7 @@ export default function Admin() {
                   savingUser ||
                   !userForm.username.trim() ||
                   !userForm.email.trim() ||
+                  !userForm.birth_date ||
                   (!editingUserID && userForm.password.length < 6) ||
                   (editingUserID && userForm.password && userForm.password.length < 6)
                 }

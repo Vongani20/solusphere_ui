@@ -60,7 +60,7 @@ async function filesToPayload(list) {
   return { documents };
 }
 
-const emptySolution = { summary: "", approach: [], whyItFits: [], team: [], risks: [] };
+const emptySolution = { summary: "", approach: [], whyItFits: [], team: [], risks: [], responses: [] };
 
 export default function RFPBuilder() {
   const [documents, setDocuments] = useState([]);
@@ -109,7 +109,7 @@ export default function RFPBuilder() {
         if (res.data.status !== "processing") {
           setSelected(res.data);
           setDirty(false);
-          setMessage(res.data.source === "ai" ? "Template built with AI." : "Template built with the built-in reader.");
+          setMessage(res.data.source === "ai" ? "Proposal written from the tender requirements." : "Proposal drafted with the built-in reader.");
           loadDocuments();
         }
       } catch {
@@ -152,7 +152,7 @@ export default function RFPBuilder() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       setSelected(res.data);
       setDirty(false);
-      setMessage("Documents uploaded. Building the template…");
+      setMessage("Documents uploaded. Writing the proposal from the requirements…");
       loadDocuments();
     } catch (err) {
       setError(getApiError(err, "Failed to upload documents."));
@@ -302,9 +302,9 @@ export default function RFPBuilder() {
                   <ClipboardDocumentListIcon className="h-6 w-6" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-slate-950">RFP Builder</h1>
+                  <h1 className="text-xl font-bold text-slate-950">Tender Proposal</h1>
                   <p className="text-sm text-slate-500">
-                    Upload a tender or RFP and get an editable RFP template with a solution idea.
+                    Upload a tender and get a proposal that answers each proposal requirement.
                   </p>
                 </div>
               </div>
@@ -352,7 +352,7 @@ export default function RFPBuilder() {
                   className="btn btn-primary inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   <DocumentArrowUpIcon className="h-5 w-5" />
-                  {uploading ? "Uploading…" : "Build RFP template"}
+                  {uploading ? "Uploading…" : "Build proposal"}
                 </button>
               </form>
             </div>
@@ -484,12 +484,22 @@ function Editor({ doc, busy, dirty, patch, onBack, onSave, onDownload, onRebuild
       {processing ? (
         <div className="card flex items-center gap-3 text-sm text-slate-600">
           <ArrowPathIcon className="h-5 w-5 animate-spin text-primary" />
-          Reading the tender and building the template. Long tenders can take a few minutes; this page updates on its own.
+          Reading the tender and writing a proposal from its requirements. Long tenders can take a few minutes; this page updates on its own.
         </div>
       ) : (
         <>
-          <Section title="Solution idea" hint="A practical way to answer this RFP, based on its scope and how bids are scored." accent>
-            <Area label="Idea" value={solution.summary} onChange={(summary) => patchSolution({ summary })} />
+          <Section title="Proposal" hint="One answer for each proposal requirement taken from the tender." accent>
+            <PairList
+              label="Requirement responses"
+              items={solution.responses}
+              leftKey="requirement"
+              rightKey="response"
+              leftPlaceholder="Proposal requirement"
+              rightPlaceholder="How the proposal meets it"
+              rightWide
+              onChange={(responses) => patchSolution({ responses })}
+            />
+            <Area label="Proposal summary" value={solution.summary} onChange={(summary) => patchSolution({ summary })} />
             <StringList label="How to deliver it" items={solution.approach} onChange={(approach) => patchSolution({ approach })} />
             <StringList label="Why this fits the evaluation" items={solution.whyItFits} onChange={(whyItFits) => patchSolution({ whyItFits })} />
             <StringList label="Team to put forward" items={solution.team} onChange={(team) => patchSolution({ team })} />
@@ -689,7 +699,7 @@ function StringList({ label, items = [], onChange, placeholder }) {
   );
 }
 
-function PairList({ label, items = [], leftKey, rightKey, leftPlaceholder, rightPlaceholder, onChange }) {
+function PairList({ label, items = [], leftKey, rightKey, leftPlaceholder, rightPlaceholder, rightWide = false, onChange }) {
   const blank = { [leftKey]: "", [rightKey]: "" };
   const rows = items.length ? items : [blank];
   const update = (index, key, value) => {
@@ -703,8 +713,8 @@ function PairList({ label, items = [], leftKey, rightKey, leftPlaceholder, right
       <div className="space-y-2">
         {rows.map((item, index) => (
           <div key={index} className="flex items-center gap-2">
-            <input className={`${inputClass} flex-[2]`} value={item[leftKey] || ""} placeholder={leftPlaceholder} onChange={(e) => update(index, leftKey, e.target.value)} />
-            <input className={`${inputClass} flex-1`} value={item[rightKey] || ""} placeholder={rightPlaceholder} onChange={(e) => update(index, rightKey, e.target.value)} />
+            <input className={`${inputClass} ${rightWide ? "flex-1" : "flex-[2]"}`} value={item[leftKey] || ""} placeholder={leftPlaceholder} onChange={(e) => update(index, leftKey, e.target.value)} />
+            <input className={`${inputClass} ${rightWide ? "flex-[2]" : "flex-1"}`} value={item[rightKey] || ""} placeholder={rightPlaceholder} onChange={(e) => update(index, rightKey, e.target.value)} />
             <RemoveButton onClick={() => onChange(items.filter((_, i) => i !== index))} />
           </div>
         ))}
