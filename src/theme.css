@@ -503,3 +503,190 @@ html.dark .border-emerald-300 {
     opacity: 0.8;
   }
 }
+
+/* ==========================================================================
+   3D depth layer
+   One light source from the top: raised surfaces get a bright top edge and a
+   soft shadow below; recessed "wells" get an inner shadow. Same language as the
+   dashboard's dimensional cards and icon orbs.
+   ========================================================================== */
+
+/* Raised surfaces */
+.card {
+  border-color: rgba(15, 23, 42, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 10px 28px -10px rgba(15, 23, 42, 0.16);
+}
+
+/* Interactive cards lift towards the light on hover */
+.lift-3d {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 10px 20px -10px rgba(15, 23, 42, 0.22);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.lift-3d:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 4px 8px rgba(15, 23, 42, 0.06),
+    0 18px 32px -12px rgba(15, 23, 42, 0.28);
+}
+
+/* Recessed wells (board columns, drop zones) so the cards on them read as raised */
+.well-3d {
+  box-shadow:
+    inset 0 2px 6px rgba(15, 23, 42, 0.08),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* Pressable buttons */
+.btn {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.2s ease, color 0.2s ease;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 60%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.18),
+    0 6px 14px -6px rgba(2, 133, 161, 0.55);
+}
+.btn-primary:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.2),
+    0 2px 6px -3px rgba(2, 133, 161, 0.5);
+}
+.btn-secondary {
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 -1px 0 rgba(15, 23, 42, 0.06),
+    0 3px 8px -4px rgba(15, 23, 42, 0.2);
+}
+.btn-secondary:active:not(:disabled) {
+  box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.12);
+}
+.btn-danger {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2),
+    0 6px 14px -6px rgba(220, 38, 38, 0.55);
+}
+.btn:focus {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px rgba(2, 133, 161, 0.3);
+}
+
+/* Inputs sit slightly into the surface */
+.input {
+  box-shadow: inset 0 2px 3px rgba(15, 23, 42, 0.05);
+}
+
+/* Square page-header icons (solid colour + white glyph) become glossy orbs */
+.h-11.w-11.items-center.justify-center.text-white,
+.h-12.w-12.items-center.justify-center.text-white {
+  border-radius: 0.9rem;
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.2));
+  box-shadow:
+    0 10px 18px -6px rgba(20, 40, 55, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.18);
+}
+
+/* Sidebar: the active page is a raised pill */
+.sidebar-link.active {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 10px 18px -8px rgba(2, 133, 161, 0.35);
+}
+
+/* Chat bubbles and theme switch */
+.bubble-3d {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 6px 14px -8px rgba(15, 23, 42, 0.35);
+}
+.theme-switch {
+  box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.06);
+}
+.theme-switch-option.active {
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 8px -3px rgba(15, 23, 42, 0.25);
+}
+
+/* Dark theme: same geometry, light comes from a faint top edge, shadows go deeper */
+html.dark .card {
+  border-color: rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 14px 30px -12px rgba(0, 0, 0, 0.7);
+}
+html.dark .lift-3d {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 22px -10px rgba(0, 0, 0, 0.75);
+}
+html.dark .lift-3d:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 20px 34px -12px rgba(0, 0, 0, 0.85);
+}
+html.dark .well-3d {
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.45),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+}
+html.dark .btn-secondary {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 3px 8px -4px rgba(0, 0, 0, 0.6);
+}
+html.dark .btn-primary {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 6px 14px -6px rgba(0, 0, 0, 0.7);
+}
+html.dark .btn:focus {
+  box-shadow:
+    0 0 0 2px #0f151b,
+    0 0 0 4px rgba(43, 179, 207, 0.45);
+}
+html.dark .input {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+html.dark .sidebar-link.active {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 18px -8px rgba(0, 0, 0, 0.6);
+}
+html.dark .bubble-3d {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 6px 14px -8px rgba(0, 0, 0, 0.7);
+}
+html.dark .theme-switch {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+html.dark .theme-switch-option.active {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 3px 8px -3px rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lift-3d,
+  .lift-3d:hover,
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+}

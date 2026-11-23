@@ -10,6 +10,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { LeafIcon } from "./BirthdayBoard";
+import DimensionalIcon from "./DimensionalIcon";
 import { formatDate } from "../utils/formatters";
 
 export const PROPOSAL_ACCEPT =
@@ -116,9 +117,7 @@ export default function ProposalHome({
         <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
           <div className="min-w-0 p-5 sm:p-7">
             <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
-                <ClipboardDocumentListIcon className="h-6 w-6" />
-              </div>
+              <DimensionalIcon icon={ClipboardDocumentListIcon} tone="forest" size="lg" />
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-slate-950">Tender Proposal</h1>
                 <p className="mt-1 text-sm text-slate-600">
@@ -164,7 +163,7 @@ export default function ProposalHome({
                   setDragging(false);
                   addFiles(e.dataTransfer.files);
                 }}
-                className={`flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition ${
+                className={`well-3d flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition ${
                   dragging
                     ? "border-emerald-500 bg-emerald-50"
                     : "border-emerald-200 bg-[#f6faf7] hover:border-emerald-400 hover:bg-emerald-50"
@@ -225,7 +224,7 @@ export default function ProposalHome({
             <ol className="mt-4 space-y-4">
               {STEPS.map((step) => (
                 <li key={step.n} className="flex gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-emerald-700 ring-1 ring-emerald-200">
+                  <span className="icon-orb icon-orb-forest h-8 w-8 text-sm font-bold">
                     {step.n}
                   </span>
                   <div className="min-w-0">
@@ -278,7 +277,7 @@ export default function ProposalHome({
               return (
                 <li
                   key={doc.id}
-                  className="relative min-w-0 rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-emerald-300 hover:shadow-md"
+                  className="lift-3d relative min-w-0 rounded-2xl border border-slate-200 bg-white p-4 hover:border-emerald-300"
                 >
                   <button type="button" onClick={() => onOpen(doc.id)} className="block w-full min-w-0 pr-8 text-left">
                     <p className="line-clamp-2 text-sm font-bold text-slate-950" title={doc.title}>

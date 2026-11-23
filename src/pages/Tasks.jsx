@@ -12,6 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
 import UserAvatar from "../components/UserAvatar";
+import DimensionalIcon from "../components/DimensionalIcon";
 import api, { getApiError, getStoredUser } from "../services/api";
 
 const COLUMNS = [
@@ -157,9 +158,7 @@ export default function Tasks() {
         <section className="card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
-                <CheckCircleIcon className="h-6 w-6" />
-              </div>
+              <DimensionalIcon icon={CheckCircleIcon} tone="teal" />
               <div className="min-w-0">
                 <h1 className="text-xl font-bold text-slate-950">Tasks</h1>
                 <p className="text-sm text-slate-500">
@@ -239,7 +238,7 @@ export default function Tasks() {
                 setDragId(null);
                 if (task) moveTask(task, column.status);
               }}
-              className={`${mobileStatus === column.status ? "block" : "hidden"} min-h-40 rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:block`}
+              className={`${mobileStatus === column.status ? "block" : "hidden"} well-3d min-h-40 rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:block`}
             >
               <header className="mb-3 flex items-center justify-between px-1">
                 <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800">
@@ -302,7 +301,7 @@ function TaskCard({ task, scope, currentUserId, onOpen, onMove, onDragStart, onD
         onDragStart();
       }}
       onDragEnd={onDragEnd}
-      className={`group rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-primary/40 hover:shadow ${
+      className={`lift-3d group rounded-xl border border-slate-200 bg-white p-3 hover:border-primary/40 ${
         task.status === "done" ? "opacity-80" : ""
       } ${task.can_change_status ? "cursor-grab active:cursor-grabbing" : ""}`}
     >

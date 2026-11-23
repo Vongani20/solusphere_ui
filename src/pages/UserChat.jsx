@@ -145,8 +145,8 @@ function ChatMessageBubble({ message, ownMessage, currentUser, onReact }) {
               emojiOnly
                 ? "bg-transparent px-1 py-1"
                 : ownMessage
-                  ? "bg-primary px-4 py-3 text-white"
-                  : "bg-slate-100 px-4 py-3 text-slate-900"
+                  ? "bubble-3d bg-primary px-4 py-3 text-white"
+                  : "bubble-3d bg-slate-100 px-4 py-3 text-slate-900"
             }`}
           >
             {!emojiOnly ? (
@@ -678,7 +678,7 @@ export default function UserChat() {
                       key={conversation.user_id}
                       type="button"
                       onClick={() => selectUser(conversation)}
-                      className={`w-full rounded-lg border p-4 text-left transition ${
+                      className={`lift-3d w-full rounded-lg border p-4 text-left ${
                         activeUserID === conversation.user_id
                           ? "border-primary bg-primary/5"
                           : isRinging
@@ -762,7 +762,7 @@ export default function UserChat() {
                       key={user.id}
                       type="button"
                       onClick={() => selectUser(user)}
-                      className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
+                      className={`lift-3d flex w-full items-center gap-3 rounded-lg border p-3 text-left ${
                         activeUserID === user.id
                           ? "border-primary bg-primary/5"
                           : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
