@@ -5,8 +5,10 @@ import './index.css';
 import './App.css';
 import './theme.css';
 import { initTheme } from './utils/theme';
+import { initNativeApp } from './native';
 
 initTheme();
+initNativeApp();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

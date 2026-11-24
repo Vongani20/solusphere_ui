@@ -12,6 +12,8 @@ lerna-debug.log*
 
 node_modules
 dist
+android/local.properties
+release/*.apk
 .env
 dist-ssr
 *.local

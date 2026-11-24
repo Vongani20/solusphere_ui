@@ -10,7 +10,9 @@ export function getCameraErrorMessage(error) {
   switch (error?.name) {
     case "NotAllowedError":
     case "PermissionDeniedError":
-      return "Camera permission was blocked. Allow camera access in the browser settings and try again.";
+      return window.solusphereNative
+        ? "Camera permission was blocked. Allow camera access for SoluSphere in your phone settings and try again."
+        : "Camera permission was blocked. Allow camera access in the browser settings and try again.";
     case "NotFoundError":
     case "DevicesNotFoundError":
       return "No camera was found on this device.";

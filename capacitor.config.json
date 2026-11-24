@@ -1,0 +1,30 @@
+{
+  "appId": "com.solugrowth.solusphere",
+  "appName": "SoluSphere",
+  "webDir": "dist",
+  "server": {
+    "url": "https://d22snf4es6f4ui.cloudfront.net",
+    "cleartext": false,
+    "androidScheme": "https",
+    "allowNavigation": [
+      "d22snf4es6f4ui.cloudfront.net",
+      "d25x8zzf939iqa.cloudfront.net"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 1200,
+      "backgroundColor": "#fafbfc",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#fafbfc",
+      "overlaysWebView": false
+    }
+  }
+}
