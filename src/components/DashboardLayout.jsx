@@ -26,6 +26,7 @@ import { useChatInbox } from "../hooks/useChatInbox";
 import DimensionalIcon from "./DimensionalIcon";
 import ThemeSwitcher from "./ThemeSwitcher";
 import UserAvatar from "./UserAvatar";
+import TechBackground from "./TechBackground";
 import { LeafIcon } from "./BirthdayBoard";
 
 const navigation = [
@@ -210,7 +211,8 @@ export default function DashboardLayout({ children }) {
         </div>
       </aside>
 
-      <div className={`lg:pl-72 ${showCallBanner ? "pt-14" : ""}`}>
+      <div className={`relative lg:pl-72 ${showCallBanner ? "pt-14" : ""}`}>
+        <TechBackground variant="subtle" className="fixed inset-0 lg:left-72" />
         {/* No top bar: on phones and tablets a floating button opens the menu. */}
         <button
           type="button"
@@ -227,7 +229,7 @@ export default function DashboardLayout({ children }) {
           ) : null}
         </button>
 
-        <main className="p-4 pt-16 sm:p-5 sm:pt-16 lg:pt-5">{children}</main>
+        <main className="app-stage p-4 pt-16 sm:p-5 sm:pt-16 lg:pt-5">{children}</main>
       </div>
     </div>
   );

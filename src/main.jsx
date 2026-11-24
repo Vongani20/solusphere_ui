@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import './App.css';
 import './theme.css';
+import './tech.css';
 import { initTheme } from './utils/theme';
 import { initNativeApp } from './native';
 

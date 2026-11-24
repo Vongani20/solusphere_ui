@@ -1,0 +1,150 @@
+/*
+ * Modern "tech" look: deep teal space backdrop, animated network canvas
+ * (components/TechBackground.jsx), perspective grid, glass sign-in card,
+ * and the SoluSphere 3D fixture (components/Sphere3D.jsx).
+ */
+
+/* Sign-in pages: always the dark tech scene, whatever the app theme */
+.tech-surface {
+  color-scheme: dark;
+  background:
+    radial-gradient(1100px 620px at 12% 8%, rgba(6, 182, 212, 0.2), transparent 60%),
+    radial-gradient(900px 520px at 92% 92%, rgba(16, 185, 129, 0.14), transparent 60%),
+    linear-gradient(160deg, #031018 0%, #06202b 55%, #03131b 100%);
+}
+
+.tech-bg {
+  pointer-events: none;
+  overflow: hidden;
+}
+.tech-bg-canvas {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+}
+
+/* Hero: a glowing grid floor receding into the distance */
+.tech-bg-hero .tech-bg-grid {
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  bottom: -12%;
+  height: 58%;
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.2) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.2) 1px, transparent 1px);
+  background-size: 52px 52px;
+  transform: perspective(620px) rotateX(64deg);
+  transform-origin: bottom center;
+  -webkit-mask-image: linear-gradient(to top, #000 8%, transparent 88%);
+  mask-image: linear-gradient(to top, #000 8%, transparent 88%);
+  animation: tech-grid-flow 7s linear infinite;
+}
+@keyframes tech-grid-flow {
+  to {
+    background-position: 0 52px, 0 0;
+  }
+}
+
+/* Subtle: a faint blueprint grid behind app pages */
+.tech-bg-subtle {
+  z-index: 0;
+}
+.tech-bg-subtle .tech-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(2, 133, 161, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(2, 133, 161, 0.05) 1px, transparent 1px);
+  background-size: 36px 36px;
+  -webkit-mask-image: radial-gradient(ellipse at 70% 0%, #000 0%, transparent 70%);
+  mask-image: radial-gradient(ellipse at 70% 0%, #000 0%, transparent 70%);
+}
+html.dark .tech-bg-subtle .tech-bg-grid {
+  background-image:
+    linear-gradient(rgba(94, 234, 212, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(94, 234, 212, 0.05) 1px, transparent 1px);
+}
+
+.tech-headline {
+  background: linear-gradient(95deg, #ffffff 0%, #a5f3fc 55%, #5eead4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tech-chip {
+  border-radius: 9999px;
+  border: 1px solid rgba(103, 232, 249, 0.28);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.3rem 0.8rem;
+  font-size: 12px;
+  font-weight: 600;
+  color: #cffafe;
+  backdrop-filter: blur(6px);
+}
+
+.sphere-3d {
+  filter: drop-shadow(0 30px 50px rgba(6, 182, 212, 0.22));
+}
+
+/* Glass sign-in card */
+.auth-glass {
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.94);
+  padding: 1.5rem;
+  color: var(--ss-heading);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.18),
+    0 30px 70px -24px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 #fff;
+}
+@media (min-width: 640px) {
+  .auth-glass {
+    padding: 2rem;
+  }
+}
+html.dark .auth-glass {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 31, 0.86);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.16),
+    0 30px 70px -24px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Anything passed as the auth footer sits on the dark scene */
+.tech-footer {
+  margin-top: 1rem;
+  color: #cbd5e1;
+}
+.tech-footer .text-label,
+.tech-footer .text-muted,
+.tech-footer .text-slate-500,
+.tech-footer .text-slate-600 {
+  color: #cbd5e1;
+}
+.tech-footer a,
+.tech-footer .text-primary {
+  color: #a5f3fc;
+}
+
+/* Dashboard empty states in dark mode */
+html.dark .bg-\[\#f7f8fa\] {
+  background-color: #1b242d;
+}
+
+/* App pages sit above the subtle backdrop */
+.app-stage {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tech-bg-hero .tech-bg-grid {
+    animation: none;
+  }
+}

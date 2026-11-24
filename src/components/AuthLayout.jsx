@@ -1,5 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import Sphere3D from "./Sphere3D";
+import TechBackground from "./TechBackground";
 
 export function AuthField({
   label,
@@ -54,33 +56,70 @@ export default function AuthLayout({
   footer,
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface p-4">
-      <div className="w-full max-w-[380px]">
-        {backLink && (
-          <Link
-            to={backLink.to}
-            className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-label hover:text-primary"
-          >
-            {backLink.label}
-          </Link>
-        )}
+    <div className="tech-surface relative min-h-screen overflow-hidden">
+      <TechBackground variant="hero" className="fixed inset-0" />
 
-        <div className="auth-card">
-          <div className="auth-hero">
-            <div className="mx-auto mb-2.5 flex h-11 w-11 items-center justify-center rounded-[11px] bg-white/92">
+      <div className="relative z-10 mx-auto grid min-h-screen w-full max-w-6xl items-center gap-10 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:px-10">
+        {/* Brand side with the 3D fixture (large screens) */}
+        <section className="hidden min-w-0 lg:block">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/90 shadow-lg shadow-cyan-500/20">
               <img src="/icon.png" alt="" className="h-6 w-6 rounded-md object-contain" />
-            </div>
-            <div className="text-[17px] font-bold text-white">{heroTitle}</div>
-            <div className="mt-0.5 text-[10px] font-medium text-white/75">{heroSubtitle}</div>
+            </span>
+            <span className="text-lg font-bold tracking-tight text-white">SoluSphere</span>
+          </div>
+          <h2 className="tech-headline mt-8 text-5xl font-extrabold leading-[1.05] tracking-tight">
+            One sphere for
+            <br />
+            your whole operation.
+          </h2>
+          <p className="mt-4 max-w-md text-base text-slate-300">
+            Chat, calls, tasks, tenders, CVs and analysis, connected in one secure workspace.
+          </p>
+          <div className="relative mt-4 flex justify-center">
+            <Sphere3D size={400} points={280} />
+          </div>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {["Face sign-in", "Secure calls", "AI tender proposals", "Paperless"].map((chip) => (
+              <li key={chip} className="tech-chip">
+                {chip}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* Form side */}
+        <div className="mx-auto w-full min-w-0 max-w-md">
+          <div className="mb-4 flex flex-col items-center lg:hidden">
+            <Sphere3D size={150} points={160} />
+            <span className="-mt-2 text-base font-bold tracking-tight text-white">SoluSphere</span>
           </div>
 
-          <div className="auth-body">
-            {title && <h1 className="mb-4 text-[15px] font-bold text-heading">{title}</h1>}
+          {backLink && (
+            <Link
+              to={backLink.to}
+              className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-200 hover:text-white"
+            >
+              {backLink.label}
+            </Link>
+          )}
+
+          <div className="auth-glass">
+            <div className="mb-5 flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+                <img src="/icon.png" alt="" className="h-6 w-6 rounded-md object-contain" />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-base font-bold text-heading">{heroTitle}</div>
+                <div className="truncate text-[11px] font-medium text-label">{heroSubtitle}</div>
+              </div>
+            </div>
+            {title && <h1 className="mb-4 text-xl font-bold text-heading">{title}</h1>}
             {children}
           </div>
-        </div>
 
-        {footer}
+          <div className="tech-footer">{footer}</div>
+        </div>
       </div>
     </div>
   );

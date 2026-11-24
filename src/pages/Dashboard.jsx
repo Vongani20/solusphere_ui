@@ -17,6 +17,8 @@ import BirthdayBoard from "../components/BirthdayBoard";
 import DashboardLayout from "../components/DashboardLayout";
 import DimensionalIcon from "../components/DimensionalIcon";
 import UserAvatar from "../components/UserAvatar";
+import Sphere3D from "../components/Sphere3D";
+import TechBackground from "../components/TechBackground";
 import { externalTools } from "../data/externalTools";
 import api, { getApiError, getStoredUser } from "../services/api";
 import { formatDate, titleize } from "../utils/formatters";
@@ -124,22 +126,26 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="dash-shell mx-auto max-w-7xl space-y-5">
-        <div className="flex flex-wrap items-end justify-between gap-3 px-1">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#7b858d]">Workspace</p>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#2d353c]">
-              Hello, {profile?.username || "there"}
-            </h1>
-            <p className="text-sm text-[#7b858d]">Your live view of people, tools, and work in progress.</p>
-          </div>
-          <div className="flex items-center gap-3 rounded-[1.25rem] bg-white/80 px-3 py-2 shadow-[0_10px_24px_rgba(45,53,60,0.08)]">
-            <UserAvatar user={profile} className="h-11 w-11 rounded-full" iconClassName="h-6 w-6" />
+        <section className="tech-surface relative overflow-hidden rounded-[1.4rem] px-5 py-5 shadow-[0_24px_50px_-20px_rgba(3,16,24,0.7)] sm:px-7">
+          <TechBackground variant="hero" className="absolute inset-0" />
+          <div className="relative z-[1] flex flex-wrap items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-[#2d353c]">{profile?.username || "Signed in"}</p>
-              <p className="truncate text-xs text-[#7b858d]">{profile?.email || "SoluSphere"}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200/80">Workspace</p>
+              <h1 className="tech-headline text-3xl font-extrabold tracking-tight">
+                Hello, {profile?.username || "there"}
+              </h1>
+              <p className="mt-1 text-sm text-slate-300">Your live view of people, tools, and work in progress.</p>
+              <div className="mt-4 inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur">
+                <UserAvatar user={profile} className="h-10 w-10 rounded-full" iconClassName="h-5 w-5" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-white">{profile?.username || "Signed in"}</p>
+                  <p className="truncate text-xs text-slate-300">{profile?.email || "SoluSphere"}</p>
+                </div>
+              </div>
             </div>
+            <Sphere3D size={190} points={200} className="hidden shrink-0 sm:block" />
           </div>
-        </div>
+        </section>
 
         <BirthdayBoard
           people={birthdays}
