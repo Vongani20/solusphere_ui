@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaceSmileIcon } from "@heroicons/react/24/outline";
 import Microsoft365Button from "../components/Microsoft365Button";
 import AuthLayout, { AuthAlert, AuthField } from "../components/AuthLayout";
+import { LOGOUT_REASON_KEY } from "../hooks/useIdleLogout";
 import api, { getApiError, saveSession } from "../services/api";
 
 export default function Login() {
@@ -10,7 +11,14 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (sessionStorage.getItem(LOGOUT_REASON_KEY) !== "inactive") return;
+    sessionStorage.removeItem(LOGOUT_REASON_KEY);
+    setNotice("You were signed out after 5 minutes of inactivity.");
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -30,6 +38,7 @@ export default function Login() {
 
   return (
     <AuthLayout title="Sign In">
+      {notice && <AuthAlert tone="info">{notice}</AuthAlert>}
       {error && <AuthAlert tone="error">{error}</AuthAlert>}
 
       <form onSubmit={handleSubmit} className="space-y-4">

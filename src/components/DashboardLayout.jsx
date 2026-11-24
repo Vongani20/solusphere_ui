@@ -18,6 +18,7 @@ import {
   TicketIcon,
   UserGroupIcon,
   UserCircleIcon,
+  VideoCameraIcon,
 } from "@heroicons/react/24/solid";
 import api, { clearSession, getStoredUser } from "../services/api";
 import { externalTools } from "../data/externalTools";
@@ -34,6 +35,7 @@ const navigation = [
   { name: "Tasks", href: "/tasks", icon: CheckCircleIcon, tone: "navy" },
   { name: "Birthdays", href: "/birthdays", icon: LeafIcon, tone: "forest" },
   { name: "Profile & Security", href: "/profile", icon: UserCircleIcon, tone: "navy" },
+  { name: "Meetings", href: "/meetings", icon: VideoCameraIcon, tone: "teal" },
   { name: "Events", href: "/events", icon: CalendarDaysIcon, tone: "amber" },
   { name: "User Chat", href: "/user-chat", icon: UserGroupIcon, tone: "forest" },
   { name: "Help Desk", href: "/helpdesk", icon: TicketIcon, tone: "rose" },

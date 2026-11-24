@@ -77,7 +77,7 @@ export default function Register() {
           value={password}
           onChange={setPassword}
           placeholder="********"
-          minLength={6}
+          minLength={8}
         />
 
         <button
@@ -93,7 +93,7 @@ export default function Register() {
 
       <Microsoft365Button
         onClick={() => registerAccount("outlook365")}
-        disabled={isLoading || Boolean(success) || !username || !email || !birthDate || password.length < 6}
+        disabled={isLoading || Boolean(success) || !username || !email || !birthDate || password.length < 8}
         className="mb-3"
       >
         {loadingProvider === "outlook365" ? "Creating Outlook 365..." : "Create Outlook 365 Account"}

@@ -17,6 +17,7 @@ import UpdatePassword from "./pages/UpdatePassword";
 import CVBuilder from "./pages/CVBuilder";
 import RFPBuilder from "./pages/RFPBuilder";
 import Tasks from "./pages/Tasks";
+import Meetings from "./pages/Meetings";
 import Innovation from "./pages/Innovation";
 import Birthdays from "./pages/Birthdays";
 import AdminRoute from "./components/AdminRoute";
@@ -24,10 +25,12 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { CallProvider } from "./context/CallContext";
 import { GroupCallProvider } from "./context/GroupCallContext";
+import useIdleLogout from "./hooks/useIdleLogout";
 import usePresenceHeartbeat from "./hooks/usePresenceHeartbeat";
 
 function AppShell({ children }) {
   usePresenceHeartbeat();
+  useIdleLogout();
   return children;
 }
 
@@ -147,6 +150,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Tasks />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/meetings"
+          element={
+            <ProtectedRoute>
+              <Meetings />
             </ProtectedRoute>
           }
         />

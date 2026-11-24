@@ -6,6 +6,7 @@ import {
   ClockIcon,
   DocumentTextIcon,
   EnvelopeIcon,
+  PaperClipIcon,
   PencilSquareIcon,
   PhoneIcon,
   PhotoIcon,
@@ -19,9 +20,11 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
+import HelpdeskAttachmentPicker, { HelpdeskAttachmentLinks } from "../components/HelpdeskAttachments";
 import api, { getApiError, saveSession } from "../services/api";
+import { filesToHelpdeskAttachments } from "../utils/helpdeskAttachments";
 import { resolveImageUrl } from "../utils/assets";
-import { formatDate, formatDateOnly, statusTone, titleize } from "../utils/formatters";
+import { formatDate, formatDateOnly, statusTone, titleize } from "../utils/formatters";
 import ResponsiveTable from "../components/ResponsiveTable";
 
 const emptyUserForm = {
@@ -81,6 +84,7 @@ export default function Admin() {
   const [deletingEventID, setDeletingEventID] = useState(null);
 
   const [ticketForm, setTicketForm] = useState(emptyTicketForm);
+  const [ticketFiles, setTicketFiles] = useState([]);
   const [editingTicketID, setEditingTicketID] = useState(null);
   const [savingTicket, setSavingTicket] = useState(false);
   const [deletingTicketID, setDeletingTicketID] = useState(null);
@@ -569,12 +573,14 @@ export default function Admin() {
 
   const resetTicketForm = () => {
     setTicketForm(emptyTicketForm);
+    setTicketFiles([]);
     setEditingTicketID(null);
   };
 
   const editTicket = (ticket) => {
     setActiveTab("helpdesk");
     setEditingTicketID(ticket.id);
+    setTicketFiles([]);
     setTicketForm({
       subject: ticket.subject || "",
       description: ticket.description || "",
@@ -594,13 +600,19 @@ export default function Admin() {
         description: ticketForm.description.trim(),
         status: ticketForm.status,
       };
+      const attachments = await filesToHelpdeskAttachments(ticketFiles);
       const res = editingTicketID
         ? await api.patch(`/admin/helpdesk/${editingTicketID}`, payload)
         : await api.post("/helpdesk", {
             subject: payload.subject,
             description: payload.description,
+            attachments,
           });
-      const savedTicket = res.data.ticket;
+      let savedTicket = res.data.ticket;
+      if (editingTicketID && attachments.length && savedTicket) {
+        const uploaded = await api.post(`/helpdesk/${savedTicket.id}/attachments`, { attachments });
+        savedTicket = uploaded.data.ticket || savedTicket;
+      }
       if (savedTicket) {
         setTickets((items) =>
           editingTicketID
@@ -770,8 +782,8 @@ export default function Admin() {
                   !userForm.username.trim() ||
                   !userForm.email.trim() ||
                   !userForm.birth_date ||
-                  (!editingUserID && userForm.password.length < 6) ||
-                  (editingUserID && userForm.password && userForm.password.length < 6)
+                  (!editingUserID && userForm.password.length < 8) ||
+                  (editingUserID && userForm.password && userForm.password.length < 8)
                 }
                 className="btn btn-primary mt-5 inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -940,6 +952,13 @@ export default function Admin() {
                     </select>
                   </label>
                 )}
+                {selectedTicket?.attachments?.length ? (
+                  <div>
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Saved attachments</span>
+                    <HelpdeskAttachmentLinks attachments={selectedTicket.attachments} />
+                  </div>
+                ) : null}
+                <HelpdeskAttachmentPicker files={ticketFiles} onChange={setTicketFiles} disabled={savingTicket} />
               </div>
               <button
                 type="submit"
@@ -964,7 +983,8 @@ export default function Admin() {
                       meta={titleize(ticket.status)}
                       statusKey={ticket.status}
                       subDetail={`${getTicketOwnerName(ticket)} - ${formatDate(ticket.created_at)}`}
-                      placeholderIcon={TicketIcon}
+                      placeholderIcon={ticket.attachments?.length ? PaperClipIcon : TicketIcon}
+                      extra={ticket.attachments?.length ? <HelpdeskAttachmentLinks attachments={ticket.attachments} /> : null}
                       onEdit={() => editTicket(ticket)}
                       onDelete={() => deleteTicket(ticket)}
                       deleting={deletingTicketID === ticket.id}
@@ -1752,6 +1772,7 @@ function RecordRow({
   disabled = false,
   togglingDisabled = false,
   disableToggleDisabled = false,
+  extra,
   onDelete,
   deleting,
   deleteDisabled = false,
@@ -1775,6 +1796,7 @@ function RecordRow({
           </div>
           <p className="mt-1 line-clamp-2 text-sm text-slate-500">{detail || "No detail"}</p>
           {subDetail && <p className="mt-1 text-xs font-medium text-slate-400">{subDetail}</p>}
+          {extra}
         </div>
       </div>
       <div className="flex shrink-0 gap-2">

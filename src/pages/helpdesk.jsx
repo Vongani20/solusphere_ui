@@ -7,12 +7,15 @@ import {
   TicketIcon,
 } from "@heroicons/react/24/outline";
 import DashboardLayout from "../components/DashboardLayout";
+import HelpdeskAttachmentPicker, { HelpdeskAttachmentLinks } from "../components/HelpdeskAttachments";
 import api, { getApiError } from "../services/api";
+import { filesToHelpdeskAttachments } from "../utils/helpdeskAttachments";
 import { formatDate, statusTone } from "../utils/formatters";
 
 export default function HelpDesk() {
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
+  const [files, setFiles] = useState([]);
   const [ticket, setTicket] = useState(null);
   const [ticketLoading, setTicketLoading] = useState(false);
   const [ticketError, setTicketError] = useState("");
@@ -32,10 +35,15 @@ export default function HelpDesk() {
     setTicket(null);
 
     try {
-      const res = await api.post("/helpdesk", { subject, description });
+      const res = await api.post("/helpdesk", {
+        subject,
+        description,
+        attachments: await filesToHelpdeskAttachments(files),
+      });
       setTicket(res.data.ticket);
       setSubject("");
       setDescription("");
+      setFiles([]);
     } catch (err) {
       setTicketError(getApiError(err, "Ticket submission failed."));
     } finally {
@@ -111,6 +119,8 @@ export default function HelpDesk() {
                 />
               </label>
 
+              <HelpdeskAttachmentPicker files={files} onChange={setFiles} disabled={ticketLoading} />
+
               <button
                 type="submit"
                 disabled={ticketLoading}
@@ -140,6 +150,12 @@ export default function HelpDesk() {
 
               <div className="space-y-4">
                 <TicketSection title="Description" content={ticket.description} icon={TicketIcon} />
+                {ticket.attachments?.length ? (
+                  <div className="border-l-4 border-primary pl-4">
+                    <h3 className="mb-1 font-bold text-slate-950">Attachments</h3>
+                    <HelpdeskAttachmentLinks attachments={ticket.attachments} />
+                  </div>
+                ) : null}
                 <TicketSection title="AI Analysis" content={ticket.aiAnalysis} icon={SparklesIcon} />
                 <TicketSection title="Suggested Solution" content={ticket.aiSolution} icon={CheckCircleIcon} />
                 <TicketSection title="Approach" content={ticket.aiApproach} icon={ClockIcon} />

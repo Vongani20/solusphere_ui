@@ -115,7 +115,7 @@ export default function ForgotPassword() {
             value={newPassword}
             onChange={setNewPassword}
             placeholder="********"
-            minLength={6}
+            minLength={8}
           />
           <AuthField
             label="Confirm Password"
@@ -123,7 +123,7 @@ export default function ForgotPassword() {
             value={confirmPassword}
             onChange={setConfirmPassword}
             placeholder="********"
-            minLength={6}
+            minLength={8}
           />
 
           <div className="grid gap-2.5 sm:grid-cols-2">

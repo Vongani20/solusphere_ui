@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
+  ComputerDesktopIcon,
   MicrophoneIcon,
   PhoneArrowDownLeftIcon,
   PhoneXMarkIcon,
@@ -73,7 +74,7 @@ function hasLiveVideo(stream) {
   return Boolean(stream?.getVideoTracks().some((track) => track.readyState === "live" && track.enabled && !track.muted));
 }
 
-function Tile({ name, image, stream, state, isSelf, muted, video }) {
+function Tile({ name, image, stream, state, isSelf, muted, video, mirrored }) {
   const showVideo = video && hasLiveVideo(stream);
   const stateLabel =
     state === "connected"
@@ -87,7 +88,7 @@ function Tile({ name, image, stream, state, isSelf, muted, video }) {
             : "Connecting…";
   return (
     <div className="relative flex aspect-video min-h-28 items-center justify-center overflow-hidden rounded-xl bg-slate-800">
-      {showVideo ? <VideoView stream={stream} mirrored={isSelf} /> : null}
+      {showVideo ? <VideoView stream={stream} mirrored={mirrored ?? isSelf} /> : null}
       {!showVideo ? (
         <UserAvatar user={{ username: name, image_url: image }} className="h-14 w-14 text-lg ring-2 ring-white/20" iconClassName="h-7 w-7" />
       ) : null}
@@ -117,12 +118,21 @@ export function GroupCallProvider({ children }) {
   const [peerStates, setPeerStates] = useState({}); // userId -> connection state
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  const [sharingScreen, setSharingScreen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [noteMeeting, setNoteMeeting] = useState(null);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [notesStatus, setNotesStatus] = useState("");
 
   const callIdRef = useRef("");
   const cursorRef = useRef(0);
   const peersRef = useRef(new Map()); // userId -> { pc, key, pending: [], remoteSet }
   const localStreamRef = useRef(null);
+  const sharingRef = useRef(false);
+  const stopScreenShareRef = useRef(async () => {});
+  const noteMeetingIdRef = useRef(null);
+  const notesDirtyRef = useRef(false);
+  const notesSaveTimer = useRef(null);
   const iceServersRef = useRef(null);
   const syncTimerRef = useRef(null);
   const syncingRef = useRef(false);
@@ -291,7 +301,15 @@ export function GroupCallProvider({ children }) {
     cursorRef.current = 0;
     setMuted(false);
     setCameraOff(false);
+    setSharingScreen(false);
+    sharingRef.current = false;
     setPickerOpen(false);
+    setNoteMeeting(null);
+    setNotesDraft("");
+    setNotesStatus("");
+    notesDirtyRef.current = false;
+    noteMeetingIdRef.current = null;
+    window.clearTimeout(notesSaveTimer.current);
   }, [closePeer]);
 
   const sync = useCallback(async () => {
@@ -335,15 +353,36 @@ export function GroupCallProvider({ children }) {
     }
   }, [handleSignal, myId, reconcilePeers, teardown]);
 
+  const cameraConstraints = { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } };
+
   const prepareMedia = useCallback(async (callType) => {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not support calls.");
     const [stream, iceServers] = await Promise.all([
       navigator.mediaDevices.getUserMedia({
         audio: AUDIO_CONSTRAINTS,
-        video: callType === "video" ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } } : false,
+        video: callType === "video" ? cameraConstraints : false,
       }),
       getIceServers(),
     ]);
+    if (callType === "screen" && navigator.mediaDevices.getDisplayMedia) {
+      try {
+        const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        const track = display.getVideoTracks()[0];
+        if (track) {
+          stream.addTrack(track);
+          sharingRef.current = true;
+          setSharingScreen(true);
+          track.onended = () => stopScreenShareRef.current();
+        }
+      } catch (err) {
+        if (err?.name !== "NotAllowedError" && err?.name !== "AbortError") {
+          stream.getTracks().forEach((track) => track.stop());
+          throw err;
+        }
+        const cam = await navigator.mediaDevices.getUserMedia({ video: cameraConstraints, audio: false });
+        cam.getVideoTracks().forEach((track) => stream.addTrack(track));
+      }
+    }
     localStreamRef.current = stream;
     iceServersRef.current = iceServers;
     setLocalStream(stream);
@@ -363,18 +402,21 @@ export function GroupCallProvider({ children }) {
 
   const startGroupCall = useCallback(
     async (userIds, callType = "audio") => {
-      if (phase === "active" || inDirectCall) return;
+      if (phase === "active" || inDirectCall) return false;
       setBusy(true);
       setError("");
       setPhase("starting");
       try {
         await prepareMedia(callType);
-        const res = await api.post("/group-calls", { user_ids: userIds, call_type: callType });
+        const wireType = callType === "screen" || callType === "video" ? "video" : "audio";
+        const res = await api.post("/group-calls", { user_ids: userIds, call_type: wireType });
         enterCall(res.data.call, res.data.signal_cursor);
+        return true;
       } catch (err) {
         teardown();
         setError(formatCallError(err, "Could not start the group call."));
         setPhase("ended");
+        return false;
       } finally {
         setBusy(false);
       }
@@ -456,6 +498,161 @@ export function GroupCallProvider({ children }) {
     setCameraOff(next);
   }, [cameraOff]);
 
+  const replaceOutgoingVideo = useCallback(async (nextTrack) => {
+    const stream = localStreamRef.current;
+    if (!stream || !nextTrack) return;
+    const previous = stream.getVideoTracks().filter((track) => track !== nextTrack);
+    for (const peer of peersRef.current.values()) {
+      const sender = peer.pc.getSenders().find((item) => item.track?.kind === "video");
+      if (sender) await sender.replaceTrack(nextTrack);
+    }
+    previous.forEach((track) => {
+      track.onended = null;
+      stream.removeTrack(track);
+      track.stop();
+    });
+    if (!stream.getTracks().includes(nextTrack)) stream.addTrack(nextTrack);
+    setLocalStream(new MediaStream(stream.getTracks()));
+  }, []);
+
+  const stopScreenShare = useCallback(async () => {
+    if (!sharingRef.current) return;
+    sharingRef.current = false;
+    setSharingScreen(false);
+    try {
+      const cam = await navigator.mediaDevices.getUserMedia({ video: cameraConstraints, audio: false });
+      const track = cam.getVideoTracks()[0];
+      if (track) await replaceOutgoingVideo(track);
+    } catch (err) {
+      localStreamRef.current?.getVideoTracks().forEach((track) => {
+        track.onended = null;
+        track.stop();
+      });
+      setError(formatCallError(err, "Could not turn the camera back on."));
+    }
+  }, [replaceOutgoingVideo]);
+
+  useEffect(() => {
+    stopScreenShareRef.current = stopScreenShare;
+  }, [stopScreenShare]);
+
+  const shareScreen = useCallback(async () => {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setError("This browser cannot share the screen.");
+      return;
+    }
+    if (!localStreamRef.current) {
+      setError("Start the call before sharing your screen.");
+      return;
+    }
+    try {
+      const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const track = display.getVideoTracks()[0];
+      if (!track) return;
+      const peers = [...peersRef.current.values()];
+      const hasSender = peers.some((peer) => peer.pc.getSenders().some((item) => item.track?.kind === "video"));
+      if (peers.length > 0 && !hasSender && localStreamRef.current.getVideoTracks().length === 0) {
+        track.stop();
+        setError("Start a video meeting to share your screen.");
+        return;
+      }
+      track.onended = () => stopScreenShareRef.current();
+      await replaceOutgoingVideo(track);
+      sharingRef.current = true;
+      setSharingScreen(true);
+      setCameraOff(false);
+    } catch (err) {
+      if (err?.name === "NotAllowedError" || err?.name === "AbortError") return;
+      setError(formatCallError(err, "Could not share your screen."));
+    }
+  }, [replaceOutgoingVideo]);
+
+  const openMeetingNotes = useCallback((meeting) => {
+    window.clearTimeout(notesSaveTimer.current);
+    if (!meeting?.id) {
+      setNoteMeeting(null);
+      setNotesDraft("");
+      setNotesStatus("");
+      noteMeetingIdRef.current = null;
+      notesDirtyRef.current = false;
+      return;
+    }
+    noteMeetingIdRef.current = meeting.id;
+    notesDirtyRef.current = false;
+    setNoteMeeting({ id: meeting.id, title: meeting.title || "Meeting" });
+    setNotesDraft(meeting.notes || "");
+    setNotesStatus("");
+  }, []);
+
+  const saveMeetingNotes = useCallback(async (text) => {
+    const id = noteMeetingIdRef.current;
+    if (!id) return;
+    setNotesStatus("Saving…");
+    try {
+      await api.put(`/meetings/${id}/notes`, { notes: text });
+      if (noteMeetingIdRef.current === id) {
+        notesDirtyRef.current = false;
+        setNotesStatus("Saved");
+      }
+    } catch (err) {
+      if (noteMeetingIdRef.current === id) setNotesStatus(getApiError(err, "Could not save notes."));
+    }
+  }, []);
+
+  const onNotesChange = useCallback(
+    (value) => {
+      notesDirtyRef.current = true;
+      setNotesDraft(value);
+      setNotesStatus("");
+      window.clearTimeout(notesSaveTimer.current);
+      notesSaveTimer.current = window.setTimeout(() => saveMeetingNotes(value), 700);
+    },
+    [saveMeetingNotes]
+  );
+
+  useEffect(() => {
+    if (phase !== "active" || !call?.id || !call?.host_id || noteMeetingIdRef.current) return undefined;
+    let stopped = false;
+    (async () => {
+      try {
+        const res = await api.get("/meetings");
+        const closest = (res.data.meetings || [])
+          .filter((meeting) => meeting.host_id === call.host_id)
+          .map((meeting) => ({ meeting, delta: Math.abs(new Date(meeting.starts_at).getTime() - Date.now()) }))
+          .filter((item) => item.delta < 2 * 60 * 60 * 1000)
+          .sort((a, b) => a.delta - b.delta)[0];
+        if (!stopped && closest && !noteMeetingIdRef.current) openMeetingNotes(closest.meeting);
+      } catch {
+        // Meetings stay on the Meetings page when this call is not tied to one.
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
+  }, [phase, call?.id, call?.host_id, openMeetingNotes]);
+
+  useEffect(() => {
+    const id = noteMeeting?.id;
+    if (!id || phase !== "active") return undefined;
+    let stopped = false;
+    const pull = async () => {
+      if (notesDirtyRef.current) return;
+      try {
+        const res = await api.get(`/meetings/${id}`);
+        if (!stopped && !notesDirtyRef.current && noteMeetingIdRef.current === id) {
+          setNotesDraft(res.data.meeting?.notes || "");
+        }
+      } catch {
+        // Keep the notes already on screen.
+      }
+    };
+    const timer = window.setInterval(pull, 4000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [noteMeeting?.id, phase]);
+
   // Ring for incoming group calls while idle.
   useEffect(() => {
     if (phase === "active" || phase === "starting") return undefined;
@@ -510,6 +707,10 @@ export function GroupCallProvider({ children }) {
     declineGroupCall,
     leaveGroupCall,
     inviteToGroupCall,
+    shareScreen,
+    stopScreenShare,
+    sharingScreen,
+    openMeetingNotes,
   };
 
   const invite = phase !== "active" && phase !== "starting" ? incoming[0] : null;
@@ -567,7 +768,7 @@ export function GroupCallProvider({ children }) {
 
       {phase === "starting" || phase === "active" || (phase === "ended" && error) ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md">
-          <div className="flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-700 bg-slate-950 text-white shadow-2xl">
+          <div className="flex max-h-full w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-slate-700 bg-slate-950 text-white shadow-2xl">
             <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-5 py-4">
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
@@ -576,7 +777,7 @@ export function GroupCallProvider({ children }) {
                 <p className="truncate text-lg font-bold">
                   {phase === "starting"
                     ? "Starting…"
-                    : `${(call?.participants || []).filter((p) => p.status === "joined").length} in call`}
+                    : `${(call?.participants || []).filter((p) => p.status === "joined").length} in call${sharingScreen ? " · sharing your screen" : ""}`}
                 </p>
               </div>
               {phase === "active" ? (
@@ -591,7 +792,8 @@ export function GroupCallProvider({ children }) {
               ) : null}
             </div>
 
-            <div className="grid flex-1 grid-cols-1 gap-3 overflow-y-auto p-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-4 sm:grid-cols-2 lg:grid-cols-3">
               <Tile
                 name={currentUser?.username || "You"}
                 image={currentUser?.image_url}
@@ -599,7 +801,8 @@ export function GroupCallProvider({ children }) {
                 state="connected"
                 isSelf
                 muted={muted}
-                video={isVideo && !cameraOff}
+                video={(isVideo && !cameraOff) || sharingScreen}
+                mirrored={!sharingScreen}
               />
               {others.map((participant) => (
                 <Tile
@@ -611,6 +814,24 @@ export function GroupCallProvider({ children }) {
                   video={isVideo}
                 />
               ))}
+            </div>
+            {noteMeeting && phase === "active" ? (
+              <aside className="flex max-h-64 w-full shrink-0 flex-col border-t border-slate-800 bg-slate-950 lg:max-h-none lg:w-80 lg:border-l lg:border-t-0">
+                <div className="px-4 pt-3">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Shared notes</p>
+                  <p className="truncate text-sm font-semibold text-white">{noteMeeting.title}</p>
+                </div>
+                <textarea
+                  value={notesDraft}
+                  onChange={(event) => onNotesChange(event.target.value)}
+                  onBlur={() => notesDirtyRef.current && saveMeetingNotes(notesDraft)}
+                  maxLength={20000}
+                  placeholder="Decisions, actions, and anything the group should remember"
+                  className="m-3 min-h-32 flex-1 resize-none rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-teal-400"
+                />
+                <p className="px-4 pb-3 text-xs text-slate-400">{notesStatus || "Everyone in the meeting can edit these notes."}</p>
+              </aside>
+            ) : null}
             </div>
 
             {Object.entries(remoteStreams).map(([userId, stream]) => (
@@ -655,6 +876,14 @@ export function GroupCallProvider({ children }) {
                       {cameraOff ? "Camera on" : "Camera off"}
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    onClick={sharingScreen ? stopScreenShare : shareScreen}
+                    className={`btn inline-flex items-center gap-2 ${sharingScreen ? "btn-primary" : "btn-secondary"}`}
+                    aria-pressed={sharingScreen}
+                  >
+                    <ComputerDesktopIcon className="h-5 w-5" /> {sharingScreen ? "Stop sharing" : "Share screen"}
+                  </button>
                   <button type="button" onClick={leaveGroupCall} className="btn btn-danger inline-flex items-center gap-2">
                     <PhoneXMarkIcon className="h-5 w-5" /> Leave
                   </button>

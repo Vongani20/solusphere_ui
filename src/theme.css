@@ -690,3 +690,50 @@ html.dark .theme-switch-option.active {
     transform: none;
   }
 }
+
+/* Forms grow and shrink with the page, and field rows wrap instead of overflowing. */
+form,
+fieldset {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.grid:has(> label input, > label select, > label textarea),
+form .grid:has(input, textarea, select) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+
+.flex:has(> input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), > select, > textarea, > .input),
+form .flex:has(> input, > select, > textarea, > .input) {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.flex > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.flex > select,
+.flex > textarea,
+.flex > .input,
+form .flex > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+form .flex > select,
+form .flex > textarea,
+form .flex > .input {
+  flex: 1 1 12rem;
+  width: auto;
+  min-width: min(100%, 12rem);
+  max-width: 100%;
+}
+
+form .flex > button,
+form .flex > a {
+  flex: 0 0 auto;
+}
+
+textarea,
+textarea.input {
+  field-sizing: content;
+  min-height: 6.5rem;
+  max-height: 18rem;
+  resize: vertical;
+  overflow: auto;
+}

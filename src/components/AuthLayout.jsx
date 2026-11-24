@@ -38,7 +38,9 @@ export function AuthAlert({ tone, children }) {
   const classes =
     tone === "success"
       ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-      : "border-rose-200 bg-rose-50 text-rose-800";
+      : tone === "info"
+        ? "border-[#c5e7ef] bg-[#f3fbfd] text-[#026d84]"
+        : "border-rose-200 bg-rose-50 text-rose-800";
 
   return (
     <div className={`mb-4 rounded-md border p-3 text-sm font-medium ${classes}`}>

@@ -83,14 +83,14 @@ export default function SecurityPanel() {
               value={newPassword}
               onChange={setNewPassword}
               placeholder="New password"
-              minLength={6}
+              minLength={8}
             />
             <SecurityField
               label="Confirm New Password"
               value={confirmPassword}
               onChange={setConfirmPassword}
               placeholder="Confirm new password"
-              minLength={6}
+              minLength={8}
             />
 
             <button
